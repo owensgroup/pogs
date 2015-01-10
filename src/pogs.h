@@ -13,6 +13,7 @@ struct PogsData {
   std::vector<FunctionObj<T> > f, g;
   const M A;
   size_t m, n;
+  size_t m_nodes, n_nodes;
 
   // Output.
   T *x, *y, *l, optval;
