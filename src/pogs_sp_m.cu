@@ -54,6 +54,27 @@ void RecvFunctionObj(FunctionObj<T> &fo) {
            MPI_STATUS_IGNORE);
 }
 
+template<typename T>
+inline int Allreduce(T *send, T *recv, int count, MPI_Op op, MPI_Comm comm);
+
+template<>
+inline int Allreduce(float *send,
+                     float *recv,
+                     int count,
+                     MPI_Op op,
+                     MPI_Comm comm) {
+  MPI_Allreduce(send, recv, count, MPI_FLOAT, op, comm);
+}
+
+template<>
+inline int Allreduce(double *send,
+                     double *recv,
+                     int count,
+                     MPI_Op op,
+                     MPI_Comm comm) {
+  MPI_Allreduce(send, recv, count, MPI_DOUBLE, op, comm);
+}
+
 template<typename T, typename M>
 void SendSubMatrices(PogsData<T, M> *pogs_data, M &A);
 
@@ -460,6 +481,14 @@ int Pogs(PogsData<T, M> *pogs_data) {
   thrust::device_vector<FunctionObj<T> > g = pogs_data->g;
 
   int err = 0;
+
+  // Average comm
+  MPI_Comm avg_comm;
+  MPI_Comm_split(MPI_COMM_WORLD, j_A, 0, &avg_comm);
+
+  // Exchange comm
+  MPI_Comm exch_comm;
+  MPI_Comm_split(MPI_COMM_WORLD, i_A, 0, &exch_comm);
  
   // Create cuBLAS hdl.
   cublasHandle_t d_hdl;
@@ -468,12 +497,17 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cusparseCreate(&s_hdl);
   cusparseMatDescr_t descr;
   cusparseCreateMatDescr(&descr);
+  cudaStream_t prox_s, aij_s;
+  cudaStreamCreate(&prox_s);
+  cudaStreamCreate(&aij_s);
 
   // Allocate data for ADMM variables.
   bool pre_process = true;
   cml::vector<T> de, z, zt;
-  cml::vector<T> zprev = cml::vector_calloc<T>(m + n);
-  cml::vector<T> z12 = cml::vector_calloc<T>(m + n);
+  cml::vector<T> zprev = cml::vector_calloc<T>(m_sub + n_sub);
+  cml::vector<T> z12 = cml::vector_calloc<T>(m_sub + n_sub);
+  cml::vector<T> zijt = cml::vector_calloc<T>(m_sub + n_sub);
+  cml::vector<T> zij12 = cml::vector_calloc<T>(m_sub + n_sub);
   cml::spmat<T, typename M::I_t, kOrd> A;
   if (pogs_data->factors.val != 0) {
     cudaMemcpy(&rho, pogs_data->factors.val, sizeof(T), cudaMemcpyDeviceToHost);
@@ -501,16 +535,51 @@ int Pogs(PogsData<T, M> *pogs_data) {
   }
 
   // Create views for x and y components.
-  cml::vector<T> d = cml::vector_subvector(&de, 0, m);
-  cml::vector<T> e = cml::vector_subvector(&de, m, n);
-  cml::vector<T> x = cml::vector_subvector(&z, 0, n);
-  cml::vector<T> y = cml::vector_subvector(&z, n, m);
-  cml::vector<T> x12 = cml::vector_subvector(&z12, 0, n);
-  cml::vector<T> y12 = cml::vector_subvector(&z12, n, m);
+  cml::vector<T> d = cml::vector_subvector(&de, 0, m_sub);
+  cml::vector<T> e = cml::vector_subvector(&de, m_sub, n_sub);
+  cml::vector<T> x = cml::vector_subvector(&z, 0, n_sub);
+  cml::vector<T> y = cml:vector_subvector(&z, n_sub, m_sub);
+  cml::vector<T> x12 = cml::vector_subvector(&z12, 0, n_sub);
+  cml::vector<T> y12 = cml::vector_subvector(&z12, n_sub, m_sub);
+  cml::vector<T> xijt = cml::vector_subvector(&zijt, 0, n_sub);
+  cml::vector<T> yij = cml::vector_subvector(&zijt, n_sub, m_sub);
+  cml::vector<T> xij12 = cml::vector_subvector(&zij12, 0, n_sub);
+  cml::vector<T> yij12 = cml::vector_subvector(&zij12, n_sub, m_sub);
+
+  // Create views for proximal operator elements
+  cml::vector<T> fy;
+  cml::vector<T> gx;
+  cml::vector<T> fy12;
+  cml::vector<T> gx12;
+  {
+    int f_increment = m_sub / n_nodes;
+    int offset_f = f_increment * i_A;
+    int num_f;
+    // Receive f proximal operators
+    if (i_A == n_nodes - 1) {
+      num_f = m_sub - (f_increment * (n_nodes - 1));
+    } else {
+      num_f = f_increment;
+    }
+
+    int g_increment = n_sub / m_nodes;
+    int offset_g = g_increment * j_A;
+    int num_g;
+    // Receive g operators
+    if (j_A == m_nodes - 1) {
+      num_g = n_sub - (g_increment * (m_nodes - 1));
+    } else {
+      num_g = g_increment;
+    }
+
+    fy = cml::vector_subvector(&x, offset_f, num_f);
+    gx = cml::vector_subvector(&y, offset_f, num_f);
+    fy12 = cml::vector_subvector(&x12, offset_f, num_f);
+    gx12 = cml::vector_subvector(&y12, offset_g, num_g);
+  }
 
   if (pre_process && !err) {
-    cml::spmat_memcpy(s_hdl, &A, pogs_data->A.val, pogs_data->A.ind,
-        pogs_data->A.ptr);
+    cml::spmat_memcpy(s_hdl, &A, A_ij.val, A_ij.ind, A_ij.ptr);
     err = sinkhorn_knopp::Equilibrate(s_hdl, d_hdl, descr, &A, &d, &e);
 
     if (!err) {
@@ -547,13 +616,17 @@ int Pogs(PogsData<T, M> *pogs_data) {
     }
   }
 
+  // todo(abp): figure out how e and d work with Block splitting
+
   // Scale f and g to account for diagonal scaling e and d.
+  /*
   if (!err) {
     thrust::transform(f.begin(), f.end(), thrust::device_pointer_cast(d.data),
         f.begin(), ApplyOp<T, thrust::divides<T> >(thrust::divides<T>()));
     thrust::transform(g.begin(), g.end(), thrust::device_pointer_cast(e.data),
         g.begin(), ApplyOp<T, thrust::multiplies<T> >(thrust::multiplies<T>()));
   }
+  */
 
   // Signal start of execution.
   if (!pogs_data->quiet)
@@ -561,8 +634,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
            "        gap    eps_gap  objective\n");
 
   // Initialize scalars.
-  T sqrtn_atol = std::sqrt(static_cast<T>(n)) * pogs_data->abs_tol;
-  T sqrtm_atol = std::sqrt(static_cast<T>(m)) * pogs_data->abs_tol;
+  T sqrtn_atol = std::sqrt(static_cast<T>(n_sub)) * pogs_data->abs_tol;
+  T sqrtm_atol = std::sqrt(static_cast<T>(m_sub)) * pogs_data->abs_tol;
   T delta = kDeltaMin, xi = static_cast<T>(1.0);
   unsigned int kd = 0, ku = 0;
   bool converged = false;
@@ -572,10 +645,67 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::vector_memcpy(&zprev, &z);
 
     // Evaluate Proximal Operators
-    cml::blas_axpy(d_hdl, -kOne, &zt, &z);
-    ProxEval(g, rho, x.data, x.stride, x12.data, x12.stride);
-    ProxEval(f, rho, y.data, y.stride, y12.data, y12.stride);
 
+    // todo(abpoms): Figure out which parts of the proximal operators this
+    //               node  has and use that to select the corresponding
+    //               elements from x and y
+
+    cml::blas_axpy(d_hdl, -kOne, &zt, &z);
+    // Scale z12 to zero so that when we merge the individual components
+    // across nodes only the values computed on that node will be set.
+    // Otherwise the previous values of z12 would be summed with the new
+    // values as we are only setting a few of the components in ProxEval.
+    cml::blas_scal(d_hdl, 0, &z12);
+    ProxEval(g, rho, gx.data, gx.stride, gx12.data, gx12.stride);
+    ProxEval(f, rho, fy.data, fy.stride, fy12.data, fy12.stride);
+
+    // Project onto A_ij
+    // b = yij12 = A_-T*(x - xijt) + yij + yt
+    cml::vector_memcpy(&yij12, &yij);
+    cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_NON_TRANSPOSE, descr, -kOne, &A,
+        &x12, kOne, &y);
+    nrm_r = cml::blas_nrm2(d_hdl, &y);
+    cml::vector_set_all(&xij12, kZero);
+    cml::spblas_solve(s_hdl, d_hdl, descr, &A, kOne, &yij12, &xij12, kTol, 5,
+                      true);
+    cml::blas_axpy(d_hdl, kOne, &x12, &x);
+    cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_NON_TRANSPOSE, descr, kOne, &A,
+        &xij12, kZero, &yij12);
+
+    // Average
+    // x = x12 (every node has a disjoint set of the elements of x12)
+    Allreduce(x12.data, x.data, x.size, MPI_SUM, avg_comm);
+    cml::vector_memcpy(&x12, &x);
+    
+    if (m_nodes > 1) {
+      Allreduce(xij12.data, x.data, x.size, MPI_SUM, avg_comm);
+      cml::blas_axpy(d_hdl, kOne, &x12, &x);
+      // x = (sum_{xij12} + x12) / (M + 1)
+      cml::blas_scal(d_hdl, 1 / (m_nodes + 1), &x);
+    }
+
+    // Exchange
+    Allreduce(y12.data, y.data, y.size, MPI_SUM, exch_comm);
+    cml::vector_memcpy(&y12, &y);
+    
+    if (n_nodes > 1) {
+      Allreduce(yij12.data, y.data, y.size, MPI_SUM, exch_comm);
+      cml::blas_scal(d_hdl, -kOne, &y);
+      cml::blas_axpy(d_hdl, kOne, &y12, &y);
+      // y = (c - sum_{c_j})/(N+1)
+      cml::blas_scal(d_hdl, 1 / (n_nodes + 1), &y);
+
+      cml::vector_memcpy(&yij, &yij12);
+      // yij = c_j + (c - sum_{c_j})/(N+1)
+      cml::blas_axpy(d_hdl, kOne, &y, &yij);
+
+      // y = - (c - sum_{c_j})/(N+1)
+      cml::blas_scal(d_hdl, -kOne, &y);
+      // y = c - (c - sum_{c_j})/(N+1)
+      cml::blas_axpy(d_hdl, kOne, &y12, &y);
+    }
+
+    
     // Compute dual variable.
     T nrm_r = 0, nrm_s = 0, gap;
     cml::blas_axpy(d_hdl, -kOne, &z12, &z);
@@ -592,17 +722,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
     if (converged || k == pogs_data->max_iter)
       break;
 
-    // Project and Update Dual Variables
-    cml::vector_memcpy(&y, &y12);
-    cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_NON_TRANSPOSE, descr, -kOne, &A,
-        &x12, kOne, &y);
-    nrm_r = cml::blas_nrm2(d_hdl, &y);
-    cml::vector_set_all(&x, kZero);
-    cml::spblas_solve(s_hdl, d_hdl, descr, &A, kOne, &y, &x, kTol, 5, true);
-    cml::blas_axpy(d_hdl, kOne, &x12, &x);
-    cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_NON_TRANSPOSE, descr, kOne, &A,
-        &x, kZero, &y);
-
     // Apply over relaxation.
     cml::blas_scal(d_hdl, kAlpha, &z);
     cml::blas_axpy(d_hdl, kOne - kAlpha, &zprev, &z);
@@ -611,6 +730,9 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::blas_axpy(d_hdl, kAlpha, &z12, &zt);
     cml::blas_axpy(d_hdl, kOne - kAlpha, &zprev, &zt);
     cml::blas_axpy(d_hdl, -kOne, &z, &zt);
+
+    cml::blas_axpy(d_hdl, kAlpha, &xij12, &xijt);
+    cml::blas_axpy(d_hdl, -kOne, &x, &xijt);
 
     bool exact = false;
     cml::blas_axpy(d_hdl, -kOne, &zprev, &z12);
@@ -683,8 +805,15 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::vector_free(&zt);
     cml::spmat_free(&A);
   }
+  cml::vector_free(&zij12);
+  cml::vector_free(&zijt);
   cml::vector_free(&z12);
   cml::vector_free(&zprev);
+  cudaStreamDestroy(aij_s);
+  cudaStreamDestroy(prox_s);
+  cusparseDestroyMatDescr(descr);
+  cusparseDestroy(s_hdl);
+  cublasDestroy(d_hdl);
   delete A_ij.val;
   delete A_ij.ptr;
   delete A_ij.ind;
