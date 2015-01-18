@@ -39,19 +39,23 @@ void SendFunctionObj(FunctionObj<T> &fo, int node, MPI_Request *request) {
 }
 
 template <typename T>
-void RecvFunctionObj(FunctionObj<T> &fo) {
-  MPI_Recv(&fo.h, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
+void RecvFunctionObj(std::vector<FunctionObj<T> > &fos) {
+  Function h;
+  T a, b, c, d, e;
+  MPI_Recv(&h, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
            MPI_STATUS_IGNORE);
-  MPI_Recv(&fo.a, sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
+  MPI_Recv(&a, sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
            MPI_STATUS_IGNORE);
-  MPI_Recv(&fo.b, sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
+  MPI_Recv(&b, sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
            MPI_STATUS_IGNORE);
-  MPI_Recv(&fo.c, sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
+  MPI_Recv(&c, sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
            MPI_STATUS_IGNORE);
-  MPI_Recv(&fo.d, sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
+  MPI_Recv(&d, sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
            MPI_STATUS_IGNORE);
-  MPI_Recv(&fo.e, sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
+  MPI_Recv(&e, sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
            MPI_STATUS_IGNORE);
+
+  fos.push_back(FunctionObj<T>(h, a, b, c, d, e));
 }
 
 template<typename T>
@@ -63,7 +67,7 @@ inline int Allreduce(float *send,
                      int count,
                      MPI_Op op,
                      MPI_Comm comm) {
-  MPI_Allreduce(send, recv, count, MPI_FLOAT, op, comm);
+  return MPI_Allreduce(send, recv, count, MPI_FLOAT, op, comm);
 }
 
 template<>
@@ -72,339 +76,282 @@ inline int Allreduce(double *send,
                      int count,
                      MPI_Op op,
                      MPI_Comm comm) {
-  MPI_Allreduce(send, recv, count, MPI_DOUBLE, op, comm);
+  return MPI_Allreduce(send, recv, count, MPI_DOUBLE, op, comm);
 }
+
+template <typename T, typename I, POGS_ORD O>
+struct SendSubMatricesHelper {
+  static void SendSubMatrices(PogsData<T, Sparse<T, I, O> > *pogs_data,
+                              Sparse<T, I, O> &A) {
+  }
+};
+
+template <typename T, typename I>
+struct SendSubMatricesHelper<T, I, ROW> {
+  static void SendSubMatrices(PogsData<T, Sparse<T, I, ROW> > *pogs_data,
+                              Sparse<T, I, ROW> &A) {
+    int kRank, kNodes;
+    MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
+    MPI_Comm_size(MPI_COMM_WORLD, &kNodes);
+
+    int m = pogs_data->m, n = pogs_data->n, nnz = pogs_data->A.nnz;
+    int m_nodes = pogs_data->m_nodes, n_nodes = pogs_data->n_nodes;
+    int m_sub = m / m_nodes, n_sub = n / n_nodes;
+
+    int i_A = kRank / n_nodes; // Row, m
+    int j_A = kRank % n_nodes; // Column, n
+
+    if (kRank == 0) {
+      MPI_Request *request = new MPI_Request[kNodes];
+      MPI_Status row_status;
+      int curr_i_A = 0;
+      int curr_j_A = 0;
+      int row = 0;
+      int node = 0;
+      I stripe_begin = 0;
+      I i = 0;
+      I row_end;
+
+      // Distribute A_ij matrices and proximal operators to nodes
+      for (curr_j_A = 0; curr_j_A < m_nodes; ++curr_j_A) {
+        while (row < (curr_j_A + 1) * m_sub) {
+          row_end = pogs_data->A.ptr[row + 1];
+
+          for (curr_i_A = 0; curr_i_A < n_nodes; ++curr_i_A) {
+            node = curr_i_A + curr_j_A * n_nodes;
+            // Find this block's portion of the row
+            while (i != row_end) {
+              if (pogs_data->A.ind[i] > (curr_i_A + 1) * m_sub) {
+                break;
+              }
+              i++;
+            }
+            MPI_Isend(pogs_data->A.val + stripe_begin,
+                      (i - stripe_begin) * sizeof(T),
+                      MPI_BYTE,
+                      node,
+                      0,
+                      MPI_COMM_WORLD,
+                      &request[node]);
+            MPI_Isend(pogs_data->A.ind + stripe_begin,
+                      (i - stripe_begin) * sizeof(I),
+                      MPI_BYTE,
+                      node,
+                      0,
+                      MPI_COMM_WORLD,
+                      &request[node]);
+            stripe_begin = i;
+          }
+          row++;
+        }
+      }
+
+      node = 0;
+      // Send proximal operators
+      int f_size = pogs_data->f.size();
+      int g_size = pogs_data->g.size();
+      for (curr_j_A = 0; curr_j_A < m_nodes; ++curr_j_A) {
+        for (curr_i_A = 0; curr_i_A < n_nodes; ++curr_i_A) {
+          for (int i = 0; i < f_size; ++i) {
+            SendFunctionObj(pogs_data->f[i], node, &request[node]);
+          }
+
+          for (int i = 0; i < g_size; ++i) {
+            SendFunctionObj(pogs_data->g[i], node, &request[node]);
+          }
+
+          node++;
+        }
+      }
+      // Wait on all nodes except master node
+      MPI_Waitall(kNodes - 1, request + 1, MPI_STATUSES_IGNORE);
+      delete[] request;
+    }
+
+    T *val = A.val;
+    I *ptr = A.ptr;
+    I *ind = A.ind;
+    int stripes = 0;
+    int count;
+    MPI_Status row_status;
+
+    // Receive A_ij matrix 
+    for (int stripes = 0; stripes < m_sub; ++stripes) {
+      MPI_Recv(val, n_sub * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
+               MPI_COMM_WORLD,
+               &row_status);
+      MPI_Get_count(&row_status, MPI_BYTE, &count);
+      count /= sizeof(T);
+      val += count;
+
+      MPI_Recv(ind, n_sub * sizeof(I), MPI_BYTE, 0, MPI_ANY_TAG,
+               MPI_COMM_WORLD,
+               &row_status);
+      MPI_Get_count(&row_status, MPI_BYTE, &count);
+      count /= sizeof(I);
+      ind += count;
+
+      // Set row/col indicies to be in local A_ij coordinates
+      for (int i = 0; i < count; ++i) {
+        ind[i] -= n_sub * j_A;
+      }
+
+      ptr[stripes + 1] = ptr[stripes] + count;
+    }
+    A.nnz = ptr[m_sub];
+
+    // Receive f proximal operators
+    int num_f = pogs_data->m;
+    pogs_data->f.clear();
+    pogs_data->f.reserve(num_f);
+    for (int i = 0; i < num_f; ++i) {
+      RecvFunctionObj(pogs_data->f);
+    }
+
+    // Receive g operators
+    int num_g = pogs_data->n;
+    pogs_data->g.clear();
+    pogs_data->g.reserve(num_g);
+    for (int i = 0; i < num_g; ++i) {
+      RecvFunctionObj(pogs_data->g);
+    }
+  }
+};
+
+template <typename T, typename I>
+struct SendSubMatricesHelper<T, I, COL> {
+  static void SendSubMatrices(PogsData<T, Sparse<T, I, COL> > *pogs_data,
+                              Sparse<T, I, COL> &A) {
+    int kRank, kNodes;
+    MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
+    MPI_Comm_size(MPI_COMM_WORLD, &kNodes);
+
+    int m = pogs_data->m, n = pogs_data->n, nnz = pogs_data->A.nnz;
+    int m_nodes = pogs_data->m_nodes, n_nodes = pogs_data->n_nodes;
+    int m_sub = m / m_nodes, n_sub = n / n_nodes;
+
+    int i_A = kRank % m_nodes;
+    int j_A = kRank / m_nodes;
+
+    if (kRank == 0) {
+      MPI_Request *request = new MPI_Request[kNodes];
+      MPI_Status col_status;
+      int curr_i_A = 0;
+      int curr_j_A = 0;
+      int col = 0;
+      int node = 0;
+      I stripe_begin = 0;
+      I i = 0;
+      I col_end;
+
+      // Distribute A_ij matrices and proximal operators to nodes
+      for (curr_i_A = 0; curr_i_A < n_nodes; ++curr_i_A) {
+        while (col < (curr_i_A + 1) * n_sub) {
+          col_end = pogs_data->A.ptr[col + 1];
+
+          for (curr_j_A = 0; curr_j_A < m_nodes; ++curr_j_A) {
+            node = curr_j_A + curr_i_A * m_nodes;
+            // Find this block's portion of the row
+            while (i != col_end) {
+              if (pogs_data->A.ind[i] > (curr_j_A + 1) * n_sub) {
+                break;
+              }
+              i++;
+            }
+            MPI_Isend(pogs_data->A.val + stripe_begin,
+                      (i - stripe_begin) * sizeof(T),
+                      MPI_BYTE,
+                      node,
+                      0,
+                      MPI_COMM_WORLD,
+                      &request[node]);
+            MPI_Isend(pogs_data->A.ind + stripe_begin,
+                      (i - stripe_begin) * sizeof(I),
+                      MPI_BYTE,
+                      node,
+                      0,
+                      MPI_COMM_WORLD,
+                      &request[node]);
+            stripe_begin = i;
+          }
+          col++;
+        }
+      }
+
+      node = 0;
+      int g_size = pogs_data->g.size();
+      int f_size = pogs_data->f.size();
+      for (curr_j_A = 0; curr_j_A < m_nodes; ++curr_j_A) {
+        for (curr_i_A = 0; curr_i_A < n_nodes; ++curr_i_A) {
+          for (int i = 0; i < g_size; ++i) {
+            SendFunctionObj(pogs_data->g[i], node, &request[node]);
+          }
+
+          for (int i = 0; i < f_size; ++i) {
+            SendFunctionObj(pogs_data->f[i], node, &request[node]);
+          }
+          node++;
+        }
+      }
+    
+      // Wait on all nodes except master node
+      MPI_Waitall(kNodes - 1, request + 1, MPI_STATUSES_IGNORE);
+      delete[] request;
+    }
+
+    T *val = A.val;
+    I *ptr = A.ptr;
+    I *ind = A.ind;
+    int stripes = 0;
+    int count;
+    MPI_Status col_status;
+
+    // Receive A_ij matrix 
+    for (int stripes = 0; stripes < n_sub; ++stripes) {
+      MPI_Recv(val, m_sub * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
+               MPI_COMM_WORLD,
+               &col_status);
+      MPI_Get_count(&col_status, MPI_BYTE, &count);
+      count /= sizeof(T);
+      val += count;
+
+      MPI_Recv(ind, m_sub * sizeof(I), MPI_BYTE, 0, MPI_ANY_TAG,
+               MPI_COMM_WORLD,
+               &col_status);
+      MPI_Get_count(&col_status, MPI_BYTE, &count);
+      count /= sizeof(I);
+      ind += count;
+
+      // Set row/col indicies to be in local A_ij coordinates
+      for (int i = 0; i < count; ++i) {
+        ind[i] -= m_sub * i_A;
+      }
+
+      ptr[stripes] = ptr[stripes - 1] + count;
+    }
+    A.nnz = ptr[n_sub];
+
+    // Receive g operators
+    int num_g = pogs_data->n;
+    pogs_data->g.clear();
+    pogs_data->g.reserve(num_g);
+    for (int i = 0; i < num_g; ++i) {
+      RecvFunctionObj(pogs_data->g);
+    }
+
+    // Receive f proximal operators
+    int num_f = pogs_data->m;
+    pogs_data->f.clear();
+    pogs_data->f.reserve(num_f);
+    for (int i = 0; i < num_f; ++i) {
+      RecvFunctionObj(pogs_data->f);
+    }
+  }
+};
 
 template<typename T, typename M>
-void SendSubMatrices(PogsData<T, M> *pogs_data, M &A);
-
-template<>
-void SendSubMatrices(PogsData<T, Sparse<T, I, ROW> > *pogs_data, M &A) {
-  int kRank, kNodes;
-  MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
-  MPI_Comm_size(MPI_COMM_WORLD, &kNodes);
-
-  int m = pogs_data->m, n = pogs_data->n, nnz = pogs_data->A.nnz;
-  int m_nodes = pogs_data->m_nodes, n_nodes = pogs_data->n_nodes;
-  int m_sub = m / m_nodes, n_sub = n / n_nodes;
-
-  int i_A = kRank / n_nodes; // Row, m
-  int j_A = kRank % n_nodes; // Column, n
-
-  if (kRank == 0) {
-    MPI_Request *request = new MPI_Request[kNodes];
-    MPI_Status row_status;
-    int curr_i_A = 0;
-    int curr_j_A = 0;
-    int row = 0;
-    int node = 0;
-    I stripe_begin = 0;
-    I i = 0;
-    I row_end;
-
-    // Distribute A_ij matrices and proximal operators to nodes
-    for (curr_j_A = 0; curr_j_A < m_nodes; ++curr_j_A) {
-      while (row < (curr_j_A + 1) * m_sub) {
-        row_end = pogs_data->A.ptr[row + 1];
-
-        for (curr_i_A = 0; curr_i_A < n_nodes; ++curr_i_A) {
-          node = curr_i_A + curr_j_A * n_nodes;
-          // Find this block's portion of the row
-          while (i != row_end) {
-            if (pogs_data->A.ind[i] > (curr_i_A + 1) * m_sub) {
-              break;
-            }
-            i++;
-          }
-          MPI_Isend(pogs_data->A.val + stripe_begin,
-                    (i - stripe_begin) * sizeof(T),
-                    MPI_BYTE,
-                    node,
-                    0,
-                    MPI_COMM_WORLD,
-                    &request[node]);
-          MPI_Isend(pogs_data->A.ind + stripe_begin,
-                    (i - stripe_begin) * sizeof(I),
-                    MPI_BYTE,
-                    node,
-                    0,
-                    MPI_COMM_WORLD,
-                    &request[node]);
-          stripe_begin = i;
-        }
-        row++;
-      }
-    }
-
-    node = 0;
-    int f_increment = m_sub / n_nodes;
-    int f_used;
-    // Send f operators
-    for (curr_j_A = 0; curr_j_A < m_nodes; ++curr_j_A) {
-      f_used = 0;
-      for (curr_i_A = 0; curr_i_A < n_nodes - 1; ++curr_i_A) {
-        for (int i = 0; i < f_increment; ++i) {
-          SendFunctionObj(pogs_data->f[f_used + i], node, &request[node]);
-        }
-        f_used += f_increment;
-        node++;
-      }
-      // Send the rest of f to the last node
-      for (; f_used < m_sub; ++f_used) {
-        SendFunctionObj(pogs_data->f[f_used], node, &request[node]);
-      }
-      node++;
-    }
-
-    node = 0;
-    int g_increment = n_sub / m_nodes;
-    int g_used = 0;
-    // Send g operators
-    for (curr_i_A = 0; curr_i_A < n_nodes; ++curr_i_A) {
-      g_used = 0;
-      for (curr_j_A = 0; curr_j_A < m_nodes - 1; ++curr_j_A) {
-        node = curr_i_A + curr_j_A * n_nodes;
-        for (int i = 0; i < g_increment; ++i) {
-          SendFunctionObj(pogs_data->g[g_used + i], node, &request[node]);
-        }
-        g_used += g_increment;
-      }
-      node = m_nodes - 1 + curr_j_A * n_nodes;
-      // Send the rest of g to the last node
-      for (; g_used < n_sub; ++g_used) {
-        SendFunctionObj(pogs_data->g[g_used], node, &request[node]);
-      }
-    }
-    
-    // Wait on all nodes except master node
-    MPI_Waitall(kNodes - 1, request + 1, MPI_STATUSES_IGNORE);
-    delete[] request;
-  }
-
-  T *val = A.val;
-  I *ptr = A.ptr;
-  I *ind = A.ind;
-  int stripes = 0;
-  int count;
-  MPI_Status row_status;
-
-  // Receive A_ij matrix 
-  for (int stripes = 0; stripes < m_sub; ++stripes) {
-    MPI_Recv(val, n_sub * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
-             MPI_COMM_WORLD,
-             &row_status);
-    MPI_Get_count(row_status, MPI_BYTE, &count);
-    count /= sizeof(T);
-    val += count;
-
-    MPI_Recv(ind, n_sub * sizeof(I), MPI_BYTE, 0, MPI_ANY_TAG,
-             MPI_COMM_WORLD,
-             &row_status);
-    MPI_Get_count(row_status, MPI_BYTE, &count);
-    count /= sizeof(I);
-    ind += count;
-
-    // Set row/col indicies to be in local A_ij coordinates
-    for (int i = 0; i < count; ++i) {
-      ind[i] -= n_sub * j_A;
-    }
-
-    ptr[stripes + 1] = ptr[stripes] + count;
-  }
-  A.nnz = ptr[m_sub];
-
-  int f_increment = m_sub / n_nodes;
-  int num_f;
-  // Receive f proximal operators
-  pogs_data->f.clear();
-  if (j_A == m_nodes - 1) {
-    num_f = m_sub - (f_increment * (n_nodes - 1));
-  } else {
-    num_f = f_increment;
-  }
-  pogs_data->f.resize(num_f);
-  for (int i = 0; i < num_f; ++i) {
-    RecvFunctionObj(pogs_data->f[i]);
-  }
-
-  int g_increment = n_sub / m_nodes;
-  int num_g;
-  // Receive g operators
-  pogs_data->g.clear();
-  if (i_A == n_nodes - 1) {
-    num_g = n_sub - (g_increment * (m_nodes - 1));
-  } else {
-    num_g = g_increment;
-  }
-  pogs_data->g.resize(num_g);
-  for (int i = 0; i < num_g; ++i) {
-    RecvFunctionObj(pogs_data->g[i]);
-  }
-}
-
-template<>
-void SendSubMatrices(PogsData<T, Sparse<T, I, COL> > *pogs_data) {
-  int kRank, kNodes;
-  MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
-  MPI_Comm_size(MPI_COMM_WORLD, &kNodes);
-
-  int m = pogs_data->m, n = pogs_data->n, nnz = pogs_data->A.nnz;
-  int m_nodes = pogs_data->m_nodes, n_nodes = pogs_data->n_nodes;
-  int m_sub = m / m_nodes, n_sub = n / n_nodes;
-
-  int i_A = kRank % m_nodes;
-  int j_A = kRank / m_nodes;
-
-  if (kRank == 0) {
-    MPI_Request *request = new MPI_Request[kNodes];
-    MPI_Status row_status;
-    int curr_i_A = 0;
-    int curr_j_A = 0;
-    int col = 0;
-    int node = 0;
-    I stripe_begin = 0;
-    I i = 0;
-    I col_end;
-
-    // Distribute A_ij matrices and proximal operators to nodes
-    for (curr_i_A = 0; curr_i_A < n_nodes; ++curr_i_A) {
-      while (row < (curr_i_A + 1) * n_sub) {
-        col_end = pogs_data->A.ptr[col + 1];
-
-        for (curr_j_A = 0; curr_j_A < m_nodes; ++curr_j_A) {
-          node = curr_j_A + curr_i_A * m_nodes;
-          // Find this block's portion of the row
-          while (i != col_end) {
-            if (pogs_data->A.ind[i] > (curr_j_A + 1) * n_sub) {
-              break;
-            }
-            i++;
-          }
-          MPI_Isend(pogs_data->A.val + stripe_begin,
-                    (i - stripe_begin) * sizeof(T),
-                    MPI_BYTE,
-                    node,
-                    0,
-                    MPI_COMM_WORLD,
-                    &request[node]);
-          MPI_Isend(pogs_data->A.ind + stripe_begin,
-                    (i - stripe_begin) * sizeof(I),
-                    MPI_BYTE,
-                    node,
-                    0,
-                    MPI_COMM_WORLD,
-                    &request[node]);
-          stripe_begin = i;
-        }
-        col++;
-      }
-    }
-
-    node = 0;
-    int g_increment = n_sub / m_nodes;
-    int g_used;
-    // Send f operators
-    for (curr_i_A = 0; curr_i_A < n_nodes; ++curr_i_A) {
-      g_used = 0;
-      for (curr_j_A = 0; curr_j_A < m_nodes - 1; ++curr_j_A) {
-        for (int i = 0; i < g_increment; ++i) {
-          SendFunctionObj(pogs_data->g[f_used + i], node, &request[node]);
-        }
-        g_used += g_increment;
-        node++;
-      }
-      // Send the rest of f to the last node
-      for (; g_used < n_sub; ++g_used) {
-        SendFunctionObj(pogs_data->g[g_used], node, &request[node]);
-      }
-      node++;
-    }
-
-    node = 0;
-    int f_increment = m_sub / n_nodes;
-    int f_used = 0;
-    // Send g operators
-    for (curr_j_A = 0; curr_j_A < m_nodes; ++curr_j_A) {
-      f_used = 0;
-      for (curr_i_A = 0; curr_i_A < n_nodes - 1; ++curr_i_A) {
-        node = curr_j_A + curr_i_A * m_nodes;
-        for (int i = 0; i < f_increment; ++i) {
-          SendFunctionObj(pogs_data->f[f_used + i], node, &request[node]);
-        }
-        f_used += f_increment;
-      }
-      node = n_nodes - 1 + curr_i_A * m_nodes;
-      // Send the rest of g to the last node
-      for (; f_used < m_sub; ++f_used) {
-        SendFunctionObj(pogs_data->f[f_used], node, &request[node]);
-      }
-    }
-    
-    // Wait on all nodes except master node
-    MPI_Waitall(kNodes - 1, request + 1, MPI_STATUSES_IGNORE);
-    delete[] request;
-  }
-
-  T *val = A.val;
-  I *ptr = A.ptr;
-  I *ind = A.ind;
-  int stripes = 0;
-  int count;
-  MPI_Status col_status;
-
-  // Receive A_ij matrix 
-  for (int stripes = 0; stripes < n_sub; ++stripes) {
-    MPI_Recv(val, m_sub * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
-             MPI_COMM_WORLD,
-             &col_status);
-    MPI_Get_count(col_status, MPI_BYTE, &count);
-    count /= sizeof(T);
-    val += count;
-
-    MPI_Recv(ind, m_sub * sizeof(I), MPI_BYTE, 0, MPI_ANY_TAG,
-             MPI_COMM_WORLD,
-             &col_status);
-    MPI_Get_count(col_status, MPI_BYTE, &count);
-    count /= sizeof(I);
-    ind += count;
-
-    // Set row/col indicies to be in local A_ij coordinates
-    for (int i = 0; i < count; ++i) {
-      ind[i] -= m_sub * i_A;
-    }
-
-    ptr[stripes] = ptr[stripes - 1] + count;
-  }
-  A.nnz = ptr[n_sub];
-
-  int g_increment = n_sub / m_nodes;
-  int num_g;
-  // Receive g operators
-  pogs_data->g.clear();
-  if (j_A == m_nodes - 1) {
-    num_g = n_sub - (g_increment * (m_nodes - 1));
-  } else {
-    num_g = g_increment;
-  }
-  pogs_data->g.resize(num_g);
-  for (int i = 0; i < num_g; ++i) {
-    RecvFunctionObj(pogs_data->g[i]);
-  }
-
-  int f_increment = m_sub / n_nodes;
-  int num_f;
-  // Receive f proximal operators
-  pogs_data->f.clear();
-  if (i_A == n_nodes - 1) {
-    num_f = m_sub - (f_increment * (n_nodes - 1));
-  } else {
-    num_f = f_increment;
-  }
-
-  pogs_data->f.resize(num_f);
-  for (int i = 0; i < num_f; ++i) {
-    RecvFunctionObj(pogs_data->f[i]);
-  }
+void SendSubMatrices(PogsData<T, M> *pogs_data, M &A) {
+  SendSubMatricesHelper<T, typename M::I_t, M::Ord>::SendSubMatrices(pogs_data, A);
 }
 
 // Proximal Operator Graph Solver.
@@ -433,7 +380,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cudaSetDevice(kLocalRank);
 
   // Transfer pogs meta data
-  MPI_Bcast(&pogs_data->A.nnz, sizeof(M::I_t), MPI_BYTE, 0, MPI_COMM_WORLD);
+  //MPI_Bcast(&pogs_data->A.nnz, sizeof(M::I_t), MPI_BYTE, 0, MPI_COMM_WORLD);
   MPI_Bcast(&pogs_data->m, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
   MPI_Bcast(&pogs_data->n, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
   MPI_Bcast(&pogs_data->m_nodes, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
@@ -441,7 +388,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   MPI_Bcast(&pogs_data->rho, sizeof(T), MPI_BYTE, 0, MPI_COMM_WORLD);
   MPI_Bcast(&pogs_data->abs_tol, sizeof(T), MPI_BYTE, 0, MPI_COMM_WORLD);
   MPI_Bcast(&pogs_data->rel_tol, sizeof(T), MPI_BYTE, 0, MPI_COMM_WORLD);
-  MPI_Bcast(&pogs_data->max_iter, 1, MPI_UINT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&pogs_data->max_iter, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
   MPI_Bcast(&pogs_data->quiet, sizeof(bool), MPI_BYTE, 0, MPI_COMM_WORLD);
   MPI_Bcast(&pogs_data->adaptive_rho, sizeof(bool), MPI_BYTE, 0,
             MPI_COMM_WORLD);
@@ -462,7 +409,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     i_A = kRank % m_nodes; // Row, m
     j_A = kRank / m_nodes; // Column, n
   }
-  Printf("Sub matrix position: i, j = %d, %d\n", iA, jA);
+  Printf("Sub matrix position: i, j = %d, %d\n", i_A, j_A);
 
   // Setup sub matrix size
   int m_sub = m / m_nodes;
@@ -470,12 +417,13 @@ int Pogs(PogsData<T, M> *pogs_data) {
   Printf("Sub matrix size: %d x %d\n", m_sub, n_sub);
 
   M A_ij(new T[m_sub * n_sub],
-         new M::I_t[M::Ord == ROW ? n_sub + 1 : m_sub + 1],
-         new M::I_t[m_sub * n_sub],
+         new typename M::I_t[M::Ord == ROW ? m_sub + 1 : n_sub + 1],
+         new typename M::I_t[m_sub * n_sub],
          m_sub * n_sub);
   SendSubMatrices(pogs_data, A_ij);
 
   int nnz_sub = A_ij.nnz;
+  Printf("Sub matrix nnz: %d\n", nnz_sub);
   
   thrust::device_vector<FunctionObj<T> > f = pogs_data->f;
   thrust::device_vector<FunctionObj<T> > g = pogs_data->g;
@@ -506,8 +454,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cml::vector<T> de, z, zt;
   cml::vector<T> zprev = cml::vector_calloc<T>(m_sub + n_sub);
   cml::vector<T> z12 = cml::vector_calloc<T>(m_sub + n_sub);
-  cml::vector<T> zijt = cml::vector_calloc<T>(m_sub + n_sub);
-  cml::vector<T> zij12 = cml::vector_calloc<T>(m_sub + n_sub);
+  cml::vector<T> xh = cml::vector_calloc<T>(n_sub);
+  cml::vector<T> xhtmp = cml::vector_calloc<T>(n_sub);
   cml::spmat<T, typename M::I_t, kOrd> A;
   if (pogs_data->factors.val != 0) {
     cudaMemcpy(&rho, pogs_data->factors.val, sizeof(T), cudaMemcpyDeviceToHost);
@@ -538,45 +486,11 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cml::vector<T> d = cml::vector_subvector(&de, 0, m_sub);
   cml::vector<T> e = cml::vector_subvector(&de, m_sub, n_sub);
   cml::vector<T> x = cml::vector_subvector(&z, 0, n_sub);
-  cml::vector<T> y = cml:vector_subvector(&z, n_sub, m_sub);
+  cml::vector<T> y = cml::vector_subvector(&z, n_sub, m_sub);
   cml::vector<T> x12 = cml::vector_subvector(&z12, 0, n_sub);
   cml::vector<T> y12 = cml::vector_subvector(&z12, n_sub, m_sub);
-  cml::vector<T> xijt = cml::vector_subvector(&zijt, 0, n_sub);
-  cml::vector<T> yij = cml::vector_subvector(&zijt, n_sub, m_sub);
-  cml::vector<T> xij12 = cml::vector_subvector(&zij12, 0, n_sub);
-  cml::vector<T> yij12 = cml::vector_subvector(&zij12, n_sub, m_sub);
-
-  // Create views for proximal operator elements
-  cml::vector<T> fy;
-  cml::vector<T> gx;
-  cml::vector<T> fy12;
-  cml::vector<T> gx12;
-  {
-    int f_increment = m_sub / n_nodes;
-    int offset_f = f_increment * i_A;
-    int num_f;
-    // Receive f proximal operators
-    if (i_A == n_nodes - 1) {
-      num_f = m_sub - (f_increment * (n_nodes - 1));
-    } else {
-      num_f = f_increment;
-    }
-
-    int g_increment = n_sub / m_nodes;
-    int offset_g = g_increment * j_A;
-    int num_g;
-    // Receive g operators
-    if (j_A == m_nodes - 1) {
-      num_g = n_sub - (g_increment * (m_nodes - 1));
-    } else {
-      num_g = g_increment;
-    }
-
-    fy = cml::vector_subvector(&x, offset_f, num_f);
-    gx = cml::vector_subvector(&y, offset_f, num_f);
-    fy12 = cml::vector_subvector(&x12, offset_f, num_f);
-    gx12 = cml::vector_subvector(&y12, offset_g, num_g);
-  }
+  cml::vector<T> xt = cml::vector_subvector(&zt, 0, n_sub);
+  cml::vector<T> yt = cml::vector_subvector(&zt, n_sub, m_sub);
 
   if (pre_process && !err) {
     cml::spmat_memcpy(s_hdl, &A, A_ij.val, A_ij.ind, A_ij.ptr);
@@ -645,65 +559,9 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::vector_memcpy(&zprev, &z);
 
     // Evaluate Proximal Operators
-
-    // todo(abpoms): Figure out which parts of the proximal operators this
-    //               node  has and use that to select the corresponding
-    //               elements from x and y
-
-    cml::blas_axpy(d_hdl, -kOne, &zt, &z);
-    // Scale z12 to zero so that when we merge the individual components
-    // across nodes only the values computed on that node will be set.
-    // Otherwise the previous values of z12 would be summed with the new
-    // values as we are only setting a few of the components in ProxEval.
-    cml::blas_scal(d_hdl, 0, &z12);
-    ProxEval(g, rho, gx.data, gx.stride, gx12.data, gx12.stride);
-    ProxEval(f, rho, fy.data, fy.stride, fy12.data, fy12.stride);
-
-    // Project onto A_ij
-    // b = yij12 = A_-T*(x - xijt) + yij + yt
-    cml::vector_memcpy(&yij12, &yij);
-    cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_NON_TRANSPOSE, descr, -kOne, &A,
-        &x12, kOne, &y);
-    nrm_r = cml::blas_nrm2(d_hdl, &y);
-    cml::vector_set_all(&xij12, kZero);
-    cml::spblas_solve(s_hdl, d_hdl, descr, &A, kOne, &yij12, &xij12, kTol, 5,
-                      true);
-    cml::blas_axpy(d_hdl, kOne, &x12, &x);
-    cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_NON_TRANSPOSE, descr, kOne, &A,
-        &xij12, kZero, &yij12);
-
-    // Average
-    // x = x12 (every node has a disjoint set of the elements of x12)
-    Allreduce(x12.data, x.data, x.size, MPI_SUM, avg_comm);
-    cml::vector_memcpy(&x12, &x);
-    
-    if (m_nodes > 1) {
-      Allreduce(xij12.data, x.data, x.size, MPI_SUM, avg_comm);
-      cml::blas_axpy(d_hdl, kOne, &x12, &x);
-      // x = (sum_{xij12} + x12) / (M + 1)
-      cml::blas_scal(d_hdl, 1 / (m_nodes + 1), &x);
-    }
-
-    // Exchange
-    Allreduce(y12.data, y.data, y.size, MPI_SUM, exch_comm);
-    cml::vector_memcpy(&y12, &y);
-    
-    if (n_nodes > 1) {
-      Allreduce(yij12.data, y.data, y.size, MPI_SUM, exch_comm);
-      cml::blas_scal(d_hdl, -kOne, &y);
-      cml::blas_axpy(d_hdl, kOne, &y12, &y);
-      // y = (c - sum_{c_j})/(N+1)
-      cml::blas_scal(d_hdl, 1 / (n_nodes + 1), &y);
-
-      cml::vector_memcpy(&yij, &yij12);
-      // yij = c_j + (c - sum_{c_j})/(N+1)
-      cml::blas_axpy(d_hdl, kOne, &y, &yij);
-
-      // y = - (c - sum_{c_j})/(N+1)
-      cml::blas_scal(d_hdl, -kOne, &y);
-      // y = c - (c - sum_{c_j})/(N+1)
-      cml::blas_axpy(d_hdl, kOne, &y12, &y);
-    }
+    cml::blas_axpy(d_hdl, -kOne, &yt, &y);
+    ProxEval(g, rho, xh.data, xh.stride, x12.data, x12.stride);
+    ProxEval(f, rho, y.data, y.stride, y12.data, y12.stride);
 
     
     // Compute dual variable.
@@ -722,6 +580,23 @@ int Pogs(PogsData<T, M> *pogs_data) {
     if (converged || k == pogs_data->max_iter)
       break;
 
+    // Project onto A_ij
+    cml::vector_memcpy(&y, &y12);
+    cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_NON_TRANSPOSE, descr, -kOne, &A,
+        &x12, kOne, &y);
+
+    // Compute residual
+    nrm_r = cml::blas_nrm2(d_hdl, &y);
+    Allreduce(&nrm_r, &nrm_s, 1, MPI_SUM, MPI_COMM_WORLD);
+    nrm_r = nrm_s;
+    nrm_s = 0;
+
+    cml::vector_set_all(&x, kZero);
+    cml::spblas_solve(s_hdl, d_hdl, descr, &A, kOne, &y, &x, kTol, 5, true);
+    cml::blas_axpy(d_hdl, kOne, &x12, &x);
+    cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_NON_TRANSPOSE, descr, kOne, &A,
+        &x, kZero, &y);
+
     // Apply over relaxation.
     cml::blas_scal(d_hdl, kAlpha, &z);
     cml::blas_axpy(d_hdl, kOne - kAlpha, &zprev, &z);
@@ -731,8 +606,13 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::blas_axpy(d_hdl, kOne - kAlpha, &zprev, &zt);
     cml::blas_axpy(d_hdl, -kOne, &z, &zt);
 
-    cml::blas_axpy(d_hdl, kAlpha, &xij12, &xijt);
-    cml::blas_axpy(d_hdl, -kOne, &x, &xijt);
+    // Average
+    if (m_nodes > 1) {
+      cml::vector_memcpy(&xhtmp, &x);
+      cml::blas_axpy(d_hdl, -kOne, &xt, &xhtmp);
+      Allreduce(xhtmp.data, xh.data, xh.size, MPI_SUM, MPI_COMM_WORLD);
+      cml::blas_scal(d_hdl, 1 / m_nodes, &xh);
+    }
 
     bool exact = false;
     cml::blas_axpy(d_hdl, -kOne, &zprev, &z12);
@@ -805,8 +685,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::vector_free(&zt);
     cml::spmat_free(&A);
   }
-  cml::vector_free(&zij12);
-  cml::vector_free(&zijt);
+  cml::vector_free(&xh);
+  cml::vector_free(&xhtmp);
   cml::vector_free(&z12);
   cml::vector_free(&zprev);
   cudaStreamDestroy(aij_s);
