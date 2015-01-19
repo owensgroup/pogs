@@ -17,6 +17,7 @@
 #include "pogs.h"
 //#include "timer.hpp"
 
+
 // Apply operator to h.a and h.d.
 template <typename T, typename Op>
 struct ApplyOp: thrust::binary_function<FunctionObj<T>, FunctionObj<T>, T> {
@@ -492,6 +493,12 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cml::vector<T> xt = cml::vector_subvector(&zt, 0, n_sub);
   cml::vector<T> yt = cml::vector_subvector(&zt, n_sub, m_sub);
 
+  // For transfering values using mpi when we don't have OMPI CUDA
+#ifndef __OMPI_CUDA__
+  std::vector<T> xh_h(n_sub);
+  std::vector<T> xhtmp_h(n_sub);
+#endif
+
   if (pre_process && !err) {
     cml::spmat_memcpy(s_hdl, &A, A_ij.val, A_ij.ind, A_ij.ptr);
     err = sinkhorn_knopp::Equilibrate(s_hdl, d_hdl, descr, &A, &d, &e);
@@ -587,9 +594,9 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
     // Compute residual
     nrm_r = cml::blas_nrm2(d_hdl, &y);
-    Allreduce(&nrm_r, &nrm_s, 1, MPI_SUM, MPI_COMM_WORLD);
-    nrm_r = nrm_s;
-    nrm_s = 0;
+    //Allreduce(&nrm_r, &nrm_s, 1, MPI_SUM, MPI_COMM_WORLD);
+    //nrm_r = nrm_s;
+    //nrm_s = 0;
 
     cml::vector_set_all(&x, kZero);
     cml::spblas_solve(s_hdl, d_hdl, descr, &A, kOne, &y, &x, kTol, 5, true);
@@ -610,7 +617,14 @@ int Pogs(PogsData<T, M> *pogs_data) {
     if (m_nodes > 1) {
       cml::vector_memcpy(&xhtmp, &x);
       cml::blas_axpy(d_hdl, -kOne, &xt, &xhtmp);
+#ifndef __OMPI_CUDA__
+      cudaMemcpy(xhtmp_h.data(), xhtmp.data, xhtmp.size, cudaMemcpyDeviceToHost);
+      Allreduce(xhtmp_h.data(), xh_h.data(), xh_h.size(), MPI_SUM,
+                MPI_COMM_WORLD);
+      cudaMemcpy(xh.data, xh_h.data(), xh_h.size(), cudaMemcpyHostToDevice);
+#else
       Allreduce(xhtmp.data, xh.data, xh.size, MPI_SUM, MPI_COMM_WORLD);
+#endif
       cml::blas_scal(d_hdl, 1 / m_nodes, &xh);
     }
 
