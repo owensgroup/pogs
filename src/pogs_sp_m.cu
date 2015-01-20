@@ -59,10 +59,10 @@ void RecvFunctionObj(std::vector<FunctionObj<T> > &fos) {
   fos.push_back(FunctionObj<T>(h, a, b, c, d, e));
 }
 
-template<typename T>
-inline int Allreduce(T *send, T *recv, int count, MPI_Op op, MPI_Comm comm);
+///////////////////////////////////////////////////////////////////////////////
+/// Templated MPI functions
+///////////////////////////////////////////////////////////////////////////////
 
-template<>
 inline int Allreduce(float *send,
                      float *recv,
                      int count,
@@ -71,7 +71,6 @@ inline int Allreduce(float *send,
   return MPI_Allreduce(send, recv, count, MPI_FLOAT, op, comm);
 }
 
-template<>
 inline int Allreduce(double *send,
                      double *recv,
                      int count,
@@ -80,14 +79,6 @@ inline int Allreduce(double *send,
   return MPI_Allreduce(send, recv, count, MPI_DOUBLE, op, comm);
 }
 
-template<typename T>
-inline int Allgather(T *send,
-                     int send_count,
-                     T *recv,
-                     int recv_count,
-                     MPI_Comm comm);
-
-template<>
 inline int Allgather(float *send,
                      int send_count,
                      float *recv,
@@ -97,7 +88,6 @@ inline int Allgather(float *send,
                        comm);
 };
 
-template<>
 inline int Allgather(double *send,
                      int send_count,
                      double *recv,
@@ -106,6 +96,28 @@ inline int Allgather(double *send,
   return MPI_Allgather(send, send_count, MPI_DOUBLE, recv, recv_count,
                        MPI_DOUBLE, comm);
 };
+
+inline int Gather(float *send,
+                  int send_count,
+                  float *recv,
+                  int recv_count,
+                  int root,
+                  MPI_Comm comm) {
+  return MPI_Gather(send, send_count, MPI_FLOAT, recv, recv_count, MPI_FLOAT,
+                    root, comm);
+};
+
+inline int Gather(double *send,
+                  int send_count,
+                  double *recv,
+                  int recv_count,
+                  int root,
+                  MPI_Comm comm) {
+  return MPI_Gather(send, send_count, MPI_DOUBLE, recv, recv_count, MPI_DOUBLE,
+                    root, comm);
+};
+
+////////////////////////
 
 template <typename T, typename I, POGS_ORD O>
 struct SendSubMatricesHelper {
@@ -558,11 +570,19 @@ int Pogs(PogsData<T, M> *pogs_data) {
 #ifndef __OMPI_CUDA__
   std::vector<T> xh_h(n_sub);
   std::vector<T> xhtmp_h(n_sub);
+
+  std::vector<T> x12_h(n_sub);
+  std::vector<T> y12_h(m_sub);
+  std::vector<T> y_h(m_sub);
 #else
   cml::matrix<T, CblasRowMajor> gather_buf =
     cml::matrix_calloc<T, CblasRowMajor>(kNodes, n_sub);
   cml::vector<T> identity = cml::vector_alloc<T>(kNodes);
   cml::vector_set_all(&identity, kOne);
+
+  cml::vector<T> x12final = cml::vector_alloc<T>(n);
+  cml::vector<T> y12final = cml::vector_alloc<T>(m);
+  cml::vector<T> yfinal = cml::vector_alloc<T>(m);
 #endif
 
   if (pre_process && !err) {
@@ -608,12 +628,12 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
   // Scale f and g to account for diagonal scaling e and d.
   /*
-  if (!err) {
+    if (!err) {
     thrust::transform(f.begin(), f.end(), thrust::device_pointer_cast(d.data),
-        f.begin(), ApplyOp<T, thrust::divides<T> >(thrust::divides<T>()));
+    f.begin(), ApplyOp<T, thrust::divides<T> >(thrust::divides<T>()));
     thrust::transform(g.begin(), g.end(), thrust::device_pointer_cast(e.data),
-        g.begin(), ApplyOp<T, thrust::multiplies<T> >(thrust::multiplies<T>()));
-  }
+    g.begin(), ApplyOp<T, thrust::multiplies<T> >(thrust::multiplies<T>()));
+    }
   */
 
   // Signal start of execution.
@@ -701,9 +721,9 @@ int Pogs(PogsData<T, M> *pogs_data) {
       cudaMemcpy(xh.data, xh_h.data(), xh_h.size(), cudaMemcpyHostToDevice);
 #else
       Allgather(xhtmp.data, xhtmp.size, gather_buf.data, xhtmp.size,
-        MPI_COMM_WORLD);
+                MPI_COMM_WORLD);
       cml::blas_gemv(d_hdl, CUBLAS_OP_T, kOne, &gather_buf, &identity, kZero,
-        &xh);
+                     &xh);
 #endif
       cml::blas_scal(d_hdl, 1.0 / m_nodes, &xh);
     }
@@ -764,24 +784,70 @@ int Pogs(PogsData<T, M> *pogs_data) {
   }
   //Printf("TIME = %e\n", timer<double>() - t);
 
+
   // Scale x, y and l for output.
-  cml::vector_div(&y12, &d);
-  cml::vector_mul(&x12, &e);
-  cml::vector_mul(&y, &d);
+  // cml::vector_div(&y12, &d);
+  // cml::vector_mul(&x12, &e);
+  // cml::vector_mul(&y, &d);
   cml::blas_scal(d_hdl, rho, &y);
 
   // Copy results to output.
-  if (pogs_data->y != 0 && !err)
-    cml::vector_memcpy(pogs_data->y, &y12);
-  if (pogs_data->x != 0 && !err)
-    cml::vector_memcpy(pogs_data->x, &x12);
-  if (pogs_data->l != 0 && !err)
-    cml::vector_memcpy(pogs_data->l, &y);
+  // Collect x and y final values
+  // todo(abpoms): Don't assume that all nodes have the same size f and g.
+  //               Actually, until we figure out non-uniform block splitting
+  //               that should be fairly true as long as we are only row-split
 
-  #ifdef __OMPI_CUDA__
+#ifndef __OMPI_CUDA__
+  if (pogs_data->y != 0 && !err) {
+    cml::vector_memcpy(y12_h.data(), &y12);
+    Gather(y12_h.data(), y12_h.size(), pogs_data->y, m, 0, MPI_COMM_WORLD);
+  }
+  if (pogs_data->x != 0 && !err) {
+    cml::vector_memcpy(x12_h.data(), &x12);
+    Gather(x12_h.data(), x12_h.size(), pogs_data->x, n, 0, MPI_COMM_WORLD);
+  }
+  if (pogs_data->l != 0 && !err) {
+    cml::vector_memcpy(y_h.data(), &y);
+    Gather(y_h.data(), y_h.size(), pogs_data->l, m, 0, MPI_COMM_WORLD);
+  }
+#else
+  // todo(abpoms): Check if MPI calls can have gpu->host or vice versa.
+  //               This would eliminate the memcpy. Assuming for now that
+  //               it is only gpu->gpu or host->host.
+  if (pogs_data->y != 0 && !err) {
+    Gather(y12.data, y12.size, y12final.data, y12.size, 0, MPI_COMM_WORLD);
+    cml::vector_memcpy(pogs_data->y, &y12);
+  }
+  if (pogs_data->x != 0 && !err) {
+    Gather(x12.data, x12.size, x12final.data, x12.size, 0, MPI_COMM_WORLD);
+    cml::vector_memcpy(pogs_data->x, &x12);
+  }
+  if (pogs_data->l != 0 && !err) {
+    Gather(y.data, y.size, yfinal.data, y.size, 0, MPI_COMM_WORLD);
+    cml::vector_memcpy(pogs_data->l, &y);
+  }
+#endif
+
+  Printf("final x: %f", pogs_data->x[0]);
+  for (int i = 1; i < n; ++i) {
+    Printf(", %f", pogs_data->x[i]);
+  }
+  Printf("\n final y: %f", pogs_data->y[0]);
+  for (int i = 1; i < m; ++i) {
+    Printf(", %f", pogs_data->y[i]);
+  }
+  Printf("\n final l: %f", pogs_data->l[0]);
+  for (int i = 1; i < m; ++i) {
+    Printf(", %f", pogs_data->l[i]);
+  }
+
+#ifdef __OMPI_CUDA__
   cml::matrix_free(&gather_buf);
   cml::vector_free(&identity);
-  #endif
+  cml::vector_free(&x12final);
+  cml::vector_free(&y12final);
+  cml::vector_free(&yfinal);
+#endif
 
   // Store rho and free memory.
   if (pogs_data->factors.val != 0 && !err) {
