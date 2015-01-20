@@ -828,17 +828,19 @@ int Pogs(PogsData<T, M> *pogs_data) {
   }
 #endif
 
-  Printf("final x: %f", pogs_data->x[0]);
-  for (int i = 1; i < n; ++i) {
-    Printf(", %f", pogs_data->x[i]);
-  }
-  Printf("\n final y: %f", pogs_data->y[0]);
-  for (int i = 1; i < m; ++i) {
-    Printf(", %f", pogs_data->y[i]);
-  }
-  Printf("\n final l: %f", pogs_data->l[0]);
-  for (int i = 1; i < m; ++i) {
-    Printf(", %f", pogs_data->l[i]);
+  if (kNode == 0) {
+    Printf("final x: %f", pogs_data->x[0]);
+    for (int i = 1; i < n; ++i) {
+      Printf(", %f", pogs_data->x[i]);
+    }
+    Printf("\n final y: %f", pogs_data->y[0]);
+    for (int i = 1; i < m; ++i) {
+      Printf(", %f", pogs_data->y[i]);
+    }
+    Printf("\n final l: %f", pogs_data->l[0]);
+    for (int i = 1; i < m; ++i) {
+      Printf(", %f", pogs_data->l[i]);
+    }
   }
 
 #ifdef __OMPI_CUDA__
