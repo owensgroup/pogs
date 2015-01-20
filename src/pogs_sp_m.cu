@@ -559,9 +559,10 @@ int Pogs(PogsData<T, M> *pogs_data) {
   std::vector<T> xh_h(n_sub);
   std::vector<T> xhtmp_h(n_sub);
 #else
-  cml::matrix<T, ROW> gather_buf = cml::matrix_calloc<T, ROW>(kNodes, n_sub);
+  cml::matrix<T, CblasRowMajor> gather_buf =
+    cml::matrix_calloc<T, CblasRowMajor>(kNodes, n_sub);
   cml::vector<T> identity = cml::vector_alloc<T>(kNodes);
-  cml::vector_set_all(identity, kOne);
+  cml::vector_set_all(&identity, kOne);
 #endif
 
   if (pre_process && !err) {
@@ -701,7 +702,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
 #else
       Allgather(xhtmp.data, xhtmp.size, gather_buf.data, xhtmp.size,
         MPI_COMM_WORLD);
-      cml::blas_gemv(d_hdl, CUBLAS_OP_T, kOne, gather_buf, identity, kZero, xh);
+      cml::blas_gemv(d_hdl, CUBLAS_OP_T, kOne, &gather_buf, &identity, kZero,
+        &xh);
 #endif
       cml::blas_scal(d_hdl, 1.0 / m_nodes, &xh);
     }
