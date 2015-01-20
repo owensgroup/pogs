@@ -80,6 +80,33 @@ inline int Allreduce(double *send,
   return MPI_Allreduce(send, recv, count, MPI_DOUBLE, op, comm);
 }
 
+template<typename T>
+inline int Allgather(T *send,
+                     int send_count,
+                     T *recv,
+                     int recv_count,
+                     MPI_Comm comm);
+
+template<>
+inline int Allgather(float *send,
+                     int send_count,
+                     float *recv,
+                     int recv_count,
+                     MPI_Comm comm) {
+  return MPI_Allgather(send, send_count, MPI_FLOAT, recv, recv_count, MPI_FLOAT,
+                       comm);
+};
+
+template<>
+inline int Allgather(double *send,
+                     int send_count,
+                     double *recv,
+                     int recv_count,
+                     MPI_Comm comm) {
+  return MPI_Allgather(send, send_count, MPI_DOUBLE, recv, recv_count,
+                       MPI_DOUBLE, comm);
+};
+
 template <typename T, typename I, POGS_ORD O>
 struct SendSubMatricesHelper {
   static void SendSubMatrices(PogsData<T, Sparse<T, I, O> > *pogs_data,
@@ -531,6 +558,10 @@ int Pogs(PogsData<T, M> *pogs_data) {
 #ifndef __OMPI_CUDA__
   std::vector<T> xh_h(n_sub);
   std::vector<T> xhtmp_h(n_sub);
+#else
+  cml::matrix<T, ROW> gather_buf = cml::matrix_calloc<T, ROW>(kNodes, n_sub);
+  cml::vector<T> identity = cml::vector_alloc<T>(kNodes);
+  cml::vector_set_all(identity, kOne);
 #endif
 
   if (pre_process && !err) {
@@ -662,12 +693,15 @@ int Pogs(PogsData<T, M> *pogs_data) {
       cml::vector_memcpy(&xhtmp, &x);
       cml::blas_axpy(d_hdl, -kOne, &xt, &xhtmp);
 #ifndef __OMPI_CUDA__
-      cudaMemcpy(xhtmp_h.data(), xhtmp.data, xhtmp.size, cudaMemcpyDeviceToHost);
+      cudaMemcpy(xhtmp_h.data(), xhtmp.data, xhtmp.size,
+                 cudaMemcpyDeviceToHost);
       Allreduce(xhtmp_h.data(), xh_h.data(), xh_h.size(), MPI_SUM,
                 MPI_COMM_WORLD);
       cudaMemcpy(xh.data, xh_h.data(), xh_h.size(), cudaMemcpyHostToDevice);
 #else
-      Allreduce(xhtmp.data, xh.data, xh.size, MPI_SUM, MPI_COMM_WORLD);
+      Allgather(xhtmp.data, xhtmp.size, gather_buf.data, xhtmp.size,
+        MPI_COMM_WORLD);
+      cml::blas_gemv(d_hdl, CUBLAS_OP_T, kOne, gather_buf, identity, kZero, xh);
 #endif
       cml::blas_scal(d_hdl, 1.0 / m_nodes, &xh);
     }
@@ -741,6 +775,11 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::vector_memcpy(pogs_data->x, &x12);
   if (pogs_data->l != 0 && !err)
     cml::vector_memcpy(pogs_data->l, &y);
+
+  #ifdef __OMPI_CUDA__
+  cml::matrix_free(&gather_buf);
+  cml::vector_free(&identity);
+  #endif
 
   // Store rho and free memory.
   if (pogs_data->factors.val != 0 && !err) {
