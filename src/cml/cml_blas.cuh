@@ -84,6 +84,14 @@ T blas_nrm2(cublasHandle_t handle, vector<T> *x) {
   return nrm2;
 }
 
+template <typename T>
+T blas_dot(cublasHandle_t handle, const vector<T> *x, const vector<T> *y) {
+  T result;
+  blas_dot(handle, x, y, &result);
+  return result;
+}
+  
+
 //
 // BLAS LEVEL 2
 //
