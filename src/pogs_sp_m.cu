@@ -762,6 +762,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
         if (rho < kRhoMax) {
           rho *= delta;
           cml::blas_scal(d_hdl, 1 / delta, &zt);
+          cml::blas_scal(d_hdl, 1 / delta, &xh);
           delta = kGamma * delta;
           ku = k;
           Printf("+ rho %e\n", rho);
@@ -771,6 +772,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
         if (rho > kRhoMin) {
           rho /= delta;
           cml::blas_scal(d_hdl, delta, &zt);
+          cml::blas_scal(d_hdl, delta, &xh);
           delta = kGamma * delta;
           kd = k;
           Printf("- rho %e\n", rho);
@@ -852,7 +854,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
         nrm += pogs_data->x[i] * pogs_data->x[i];
       }
       nrm = sqrtf(nrm);
-      Printf("final x nrm: %f", nrm);
+      Printf("final x nrm: %f\n", nrm);
     }
 
     if (pogs_data->y != 0) {
@@ -861,7 +863,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
         nrm += pogs_data->y[i] * pogs_data->y[i];
       }
       nrm = sqrtf(nrm);
-      Printf("final y nrm: %f", nrm);
+      Printf("final y nrm: %f\n", nrm);
     }
 
     if (pogs_data->l != 0) {
@@ -870,7 +872,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
         nrm += pogs_data->l[i] * pogs_data->l[i];
       }
       nrm = sqrtf(nrm);
-      Printf("final l nrm: %f", nrm);
+      Printf("final l nrm: %f\n", nrm);
     }
   }
 
