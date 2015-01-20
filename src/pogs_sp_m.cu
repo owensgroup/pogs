@@ -797,58 +797,82 @@ int Pogs(PogsData<T, M> *pogs_data) {
   //               Actually, until we figure out non-uniform block splitting
   //               that should be fairly true as long as we are only row-split
 
-#ifndef __OMPI_CUDA__
-  if (pogs_data->y != 0 && !err) {
-    cml::vector_memcpy(y12_h.data(), &y12);
-    Gather(y12_h.data(), y12_h.size(), pogs_data->y, m, 0, MPI_COMM_WORLD);
-  }
-  if (pogs_data->x != 0 && !err) {
-    cml::vector_memcpy(x12_h.data(), &x12);
-    Gather(x12_h.data(), x12_h.size(), pogs_data->x, n, 0, MPI_COMM_WORLD);
-  }
-  if (pogs_data->l != 0 && !err) {
-    cml::vector_memcpy(y_h.data(), &y);
-    Gather(y_h.data(), y_h.size(), pogs_data->l, m, 0, MPI_COMM_WORLD);
-  }
-#else
   // todo(abpoms): Check if MPI calls can have gpu->host or vice versa.
   //               This would eliminate the memcpy. Assuming for now that
   //               it is only gpu->gpu or host->host.
+
   if (pogs_data->y != 0 && !err) {
-    Gather(y12.data, y12.size, y12final.data, y12.size, 0, MPI_COMM_WORLD);
-    cml::vector_memcpy(pogs_data->y, &y12final);
+    if (m_sub == m) {
+      cml::vector_memcpy(pogs_data->y, &y12);
+    } else {
+#ifndef __OMPI_CUDA__
+      cml::vector_memcpy(y12_h.data(), &y12);
+      Gather(y12_h.data(), y12_h.size(), pogs_data->y, m_sub, 0,
+             MPI_COMM_WORLD);
+#else
+      Gather(y12.data, y12.size, y12final.data, y12.size, 0, MPI_COMM_WORLD);
+      cml::vector_memcpy(pogs_data->y, &y12final);
+#endif
+    }
   }
+
   if (pogs_data->x != 0 && !err) {
-    Gather(x12.data, x12.size, x12final.data, x12.size, 0, MPI_COMM_WORLD);
-    cml::vector_memcpy(pogs_data->x, &x12final);
+    if (n_sub == n) {
+      cml::vector_memcpy(pogs_data->x, &x12);
+    } else {
+#ifndef __OMPI_CUDA__
+      cml::vector_memcpy(x12_h.data(), &x12);
+      Gather(x12_h.data(), x12_h.size(), pogs_data->x, n_sub, 0,
+             MPI_COMM_WORLD);
+#else
+      Gather(x12.data, x12.size, x12final.data, x12.size, 0, MPI_COMM_WORLD);
+      cml::vector_memcpy(pogs_data->x, &x12final);
+#endif
+    }
   }
+
   if (pogs_data->l != 0 && !err) {
-    Gather(y.data, y.size, yfinal.data, y.size, 0, MPI_COMM_WORLD);
-    cml::vector_memcpy(pogs_data->l, &yfinal);
+    if (m_sub == m) {
+      cml::vector_memcpy(pogs_data->l, &y);
+    } else {
+#ifndef __OMPI_CUDA__
+      cml::vector_memcpy(y_h.data(), &y);
+      Gather(y_h.data(), y_h.size(), pogs_data->l, m_sub, 0, MPI_COMM_WORLD);
+#else
+      Gather(y.data, y.size, yfinal.data, y.size, 0, MPI_COMM_WORLD);
+      cml::vector_memcpy(pogs_data->l, &yfinal);
+#endif
+    }
   }
 #endif
 
   if (kRank == 0) {
     T nrm = 0;
-    for (int i = 0; i < n; ++i) {
-      nrm += pogs_data->x[i] * pogs_data->x[i];
+    if (pogs_data->x != 0) {
+      for (int i = 0; i < n; ++i) {
+        nrm += pogs_data->x[i] * pogs_data->x[i];
+      }
+      nrm = sqrtf(nrm);
+      Printf("final x nrm: %f", nrm);
     }
-    nrm = sqrtf(nrm);
-    Printf("final x nrm: %f", nrm);
 
-    nrm = 0;
-    for (int i = 0; i < m; ++i) {
-      nrm += pogs_data->y[i] * pogs_data->y[i];
+    if (pogs_data->y != 0) {
+      nrm = 0;
+      for (int i = 0; i < m; ++i) {
+        nrm += pogs_data->y[i] * pogs_data->y[i];
+      }
+      nrm = sqrtf(nrm);
+      Printf("final y nrm: %f", nrm);
     }
-    nrm = sqrtf(nrm);
-    Printf("final y nrm: %f", nrm);
 
-    nrm = 0;
-    for (int i = 0; i < m; ++i) {
-      nrm += pogs_data->l[i] * pogs_data->l[i];
+    if (pogs_data->l != 0) {
+      nrm = 0;
+      for (int i = 0; i < m; ++i) {
+        nrm += pogs_data->l[i] * pogs_data->l[i];
+      }
+      nrm = sqrtf(nrm);
+      Printf("final l nrm: %f", nrm);
     }
-    nrm = sqrtf(nrm);
-    Printf("final l nrm: %f", nrm);
   }
 
 #ifdef __OMPI_CUDA__
