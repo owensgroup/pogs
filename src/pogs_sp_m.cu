@@ -844,7 +844,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
 #endif
     }
   }
-#endif
 
   if (kRank == 0) {
     T nrm = 0;
