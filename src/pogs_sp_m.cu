@@ -148,22 +148,33 @@ struct SendSubMatricesHelper<T, I, ROW> {
       }
 
       node = 0;
+      int f_increment = m_sub;
+      int f_used = 0;
+      // Send f operators
+      for (curr_j_A = 0; curr_j_A < m_nodes - 1; ++curr_j_A) {
+        // Send the rest of f to the last node
+        for (; f_used < m_sub * (curr_j_A + 1); ++f_used) {
+          SendFunctionObj(pogs_data->f[f_used], node, &request[node]);
+        }
+        node++;
+      }
+
+      for (; f_used < m; ++f_used) {
+        SendFunctionObj(pogs_data->f[f_used], node, &request[node]);
+      }
+
+      node = 0;
       // Send proximal operators
-      int f_size = pogs_data->f.size();
+      node = 0;
       int g_size = pogs_data->g.size();
       for (curr_j_A = 0; curr_j_A < m_nodes; ++curr_j_A) {
-        for (curr_i_A = 0; curr_i_A < n_nodes; ++curr_i_A) {
-          for (int i = 0; i < f_size; ++i) {
-            SendFunctionObj(pogs_data->f[i], node, &request[node]);
-          }
-
-          for (int i = 0; i < g_size; ++i) {
-            SendFunctionObj(pogs_data->g[i], node, &request[node]);
-          }
-
-          node++;
+        for (int i = 0; i < g_size; ++i) {
+          SendFunctionObj(pogs_data->g[i], node, &request[node]);
         }
+
+        node++;
       }
+
       // Wait on all nodes except master node
       MPI_Waitall(kNodes - 1, request + 1, MPI_STATUSES_IGNORE);
       delete[] request;
@@ -202,7 +213,12 @@ struct SendSubMatricesHelper<T, I, ROW> {
     A.nnz = ptr[m_sub];
 
     // Receive f proximal operators
-    int num_f = pogs_data->m;
+    int num_f;
+    if (j_A == m_nodes - 1) {
+      num_f = m - m_sub * (m_nodes - 1);
+    } else {
+      num_f = m_sub;
+    }
     pogs_data->f.clear();
     pogs_data->f.reserve(num_f);
     for (int i = 0; i < num_f; ++i) {
@@ -281,18 +297,28 @@ struct SendSubMatricesHelper<T, I, COL> {
 
       node = 0;
       int g_size = pogs_data->g.size();
-      int f_size = pogs_data->f.size();
       for (curr_j_A = 0; curr_j_A < m_nodes; ++curr_j_A) {
-        for (curr_i_A = 0; curr_i_A < n_nodes; ++curr_i_A) {
-          for (int i = 0; i < g_size; ++i) {
-            SendFunctionObj(pogs_data->g[i], node, &request[node]);
-          }
-
-          for (int i = 0; i < f_size; ++i) {
-            SendFunctionObj(pogs_data->f[i], node, &request[node]);
-          }
-          node++;
+        for (int i = 0; i < g_size; ++i) {
+          SendFunctionObj(pogs_data->g[i], node, &request[node]);
         }
+
+        node++;
+      }
+
+      node = 0;
+      int f_increment = m_sub;
+      int f_used = 0;
+      // Send f operators
+      for (curr_j_A = 0; curr_j_A < m_nodes - 1; ++curr_j_A) {
+        // Send the rest of f to the last node
+        for (; f_used < m_sub * (curr_j_A + 1); ++f_used) {
+          SendFunctionObj(pogs_data->f[f_used], node, &request[node]);
+        }
+        node++;
+      }
+
+      for (; f_used < m; ++f_used) {
+        SendFunctionObj(pogs_data->f[f_used], node, &request[node]);
       }
     
       // Wait on all nodes except master node
@@ -341,7 +367,12 @@ struct SendSubMatricesHelper<T, I, COL> {
     }
 
     // Receive f proximal operators
-    int num_f = pogs_data->m;
+    int num_f;
+    if (j_A == m_nodes - 1) {
+      num_f = m - m_sub * (m_nodes - 1);
+    } else {
+      num_f = m_sub;
+    }
     pogs_data->f.clear();
     pogs_data->f.reserve(num_f);
     for (int i = 0; i < num_f; ++i) {
@@ -457,6 +488,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cml::vector<T> z12 = cml::vector_calloc<T>(m_sub + n_sub);
   cml::vector<T> xh = cml::vector_calloc<T>(n_sub);
   cml::vector<T> xhtmp = cml::vector_calloc<T>(n_sub);
+  cml::vector<T> x12tmp = cml::vector_calloc<T>(n_sub);
   cml::spmat<T, typename M::I_t, kOrd> A;
   if (pogs_data->factors.val != 0) {
     cudaMemcpy(&rho, pogs_data->factors.val, sizeof(T), cudaMemcpyDeviceToHost);
@@ -492,6 +524,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cml::vector<T> y12 = cml::vector_subvector(&z12, n_sub, m_sub);
   cml::vector<T> xt = cml::vector_subvector(&zt, 0, n_sub);
   cml::vector<T> yt = cml::vector_subvector(&zt, n_sub, m_sub);
+  cml::vector<T> xprev = cml::vector_subvector(&zprev, 0, n_sub);
+  cml::vector<T> yprev = cml::vector_subvector(&zprev, n_sub, m_sub);
 
   // For transfering values using mpi when we don't have OMPI CUDA
 #ifndef __OMPI_CUDA__
@@ -501,7 +535,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
   if (pre_process && !err) {
     cml::spmat_memcpy(s_hdl, &A, A_ij.val, A_ij.ind, A_ij.ptr);
-    err = sinkhorn_knopp::Equilibrate(s_hdl, d_hdl, descr, &A, &d, &e);
+    // Avoid equilibration for now
+    //err = sinkhorn_knopp::Equilibrate(s_hdl, d_hdl, descr, &A, &d, &e);
 
     if (!err) {
       // TODO: Issue warning if x == NULL or y == NULL
@@ -566,23 +601,32 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::vector_memcpy(&zprev, &z);
 
     // Evaluate Proximal Operators
-    cml::blas_axpy(d_hdl, -kOne, &yt, &y);
+    cml::blas_axpy(d_hdl, -kOne, &zt, &z);
     ProxEval(g, rho, xh.data, xh.stride, x12.data, x12.stride);
     ProxEval(f, rho, y.data, y.stride, y12.data, y12.stride);
 
     
     // Compute dual variable.
-    T nrm_r = 0, nrm_s = 0, gap;
+    T nrm_r = 0, nrm_s = 0, gap, z_nrm, z12_nrm, temp;
     cml::blas_axpy(d_hdl, -kOne, &z12, &z);
     cml::blas_dot(d_hdl, &z, &z12, &gap);
     gap = std::abs(gap);
     pogs_data->optval = FuncEval(f, y12.data, 1) + FuncEval(g, x12.data, 1);
+
+    // Calculate global z norm
+    z_nrm = cml::blas_dot(d_hdl, &y, &y);
+    Allreduce(&z_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
+    z_nrm = sqrtf(cml::blas_dot(d_hdl, &xh, &xh) + temp);
+
+    // Calculate global z12 norm
+    z12_nrm = cml::blas_dot(d_hdl, &y12, &y12);
+    Allreduce(&z12_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
+    z12_nrm = sqrtf(cml::blas_dot(d_hdl, &x12, &x12) + temp);
+    
     T eps_gap = std::sqrt(static_cast<T>(m + n)) * pogs_data->abs_tol +
-        pogs_data->rel_tol * cml::blas_nrm2(d_hdl, &z) *
-        cml::blas_nrm2(d_hdl, &z12);
-    T eps_pri = sqrtm_atol + pogs_data->rel_tol * cml::blas_nrm2(d_hdl, &z12);
-    T eps_dua = sqrtn_atol + pogs_data->rel_tol * rho * 
-        cml::blas_nrm2(d_hdl, &z);
+        pogs_data->rel_tol * z_nrm * z12_nrm;
+    T eps_pri = sqrtm_atol + pogs_data->rel_tol * z12_nrm;
+    T eps_dua = sqrtn_atol + pogs_data->rel_tol * rho * z_nrm;
 
     if (converged || k == pogs_data->max_iter)
       break;
@@ -592,11 +636,11 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_NON_TRANSPOSE, descr, -kOne, &A,
         &x12, kOne, &y);
 
-    // Compute residual
-    nrm_r = cml::blas_nrm2(d_hdl, &y);
-    //Allreduce(&nrm_r, &nrm_s, 1, MPI_SUM, MPI_COMM_WORLD);
-    //nrm_r = nrm_s;
-    //nrm_s = 0;
+    // Compute primal residual
+    nrm_r = cml::blas_dot(d_hdl, &y, &y);
+    Allreduce(&nrm_r, &nrm_s, 1, MPI_SUM, MPI_COMM_WORLD);
+    nrm_r = sqrtf(nrm_s);
+    nrm_s = 0;
 
     cml::vector_set_all(&x, kZero);
     cml::spblas_solve(s_hdl, d_hdl, descr, &A, kOne, &y, &x, kTol, 5, true);
@@ -625,17 +669,26 @@ int Pogs(PogsData<T, M> *pogs_data) {
 #else
       Allreduce(xhtmp.data, xh.data, xh.size, MPI_SUM, MPI_COMM_WORLD);
 #endif
-      cml::blas_scal(d_hdl, 1 / m_nodes, &xh);
+      cml::blas_scal(d_hdl, 1.0 / m_nodes, &xh);
     }
 
     bool exact = false;
     cml::blas_axpy(d_hdl, -kOne, &zprev, &z12);
     cml::blas_axpy(d_hdl, -kOne, &z, &zprev);
-    nrm_s = rho * cml::blas_nrm2(d_hdl, &zprev);
+
+    // Calculate global dual residual norm approximation
+    z_nrm = cml::blas_dot(d_hdl, &yprev, &yprev);
+    Allreduce(&z_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
+    z_nrm = sqrtf(cml::blas_dot(d_hdl, &xprev, &xprev) + temp);
+
+    nrm_s = rho * z_nrm;
     if (nrm_r < eps_pri && nrm_s < eps_dua) {
+      // Calculate global A'y12 + x12
       cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_TRANSPOSE, descr, kOne, &A,
           &y12, kOne, &x12);
-      nrm_s = rho * cml::blas_nrm2(d_hdl, &x12);
+      nrm_s = cml::blas_dot(d_hdl, &x12, &x12);
+      Allreduce(&nrm_s, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
+      nrm_s = rho * sqrtf(temp);
       exact = true;
     }
 
