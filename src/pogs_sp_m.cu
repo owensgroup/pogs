@@ -816,31 +816,39 @@ int Pogs(PogsData<T, M> *pogs_data) {
   //               it is only gpu->gpu or host->host.
   if (pogs_data->y != 0 && !err) {
     Gather(y12.data, y12.size, y12final.data, y12.size, 0, MPI_COMM_WORLD);
-    cml::vector_memcpy(pogs_data->y, &y12);
+    cml::vector_memcpy(pogs_data->y, &y12final);
   }
   if (pogs_data->x != 0 && !err) {
     Gather(x12.data, x12.size, x12final.data, x12.size, 0, MPI_COMM_WORLD);
-    cml::vector_memcpy(pogs_data->x, &x12);
+    cml::vector_memcpy(pogs_data->x, &x12final);
   }
   if (pogs_data->l != 0 && !err) {
     Gather(y.data, y.size, yfinal.data, y.size, 0, MPI_COMM_WORLD);
-    cml::vector_memcpy(pogs_data->l, &y);
+    cml::vector_memcpy(pogs_data->l, &yfinal);
   }
 #endif
 
-  if (kNode == 0) {
-    Printf("final x: %f", pogs_data->x[0]);
-    for (int i = 1; i < n; ++i) {
-      Printf(", %f", pogs_data->x[i]);
+  if (kRank == 0) {
+    T nrm = 0;
+    for (int i = 0; i < n; ++i) {
+      nrm += pogs_data->x[i] * pogs_data->x[i];
     }
-    Printf("\n final y: %f", pogs_data->y[0]);
-    for (int i = 1; i < m; ++i) {
-      Printf(", %f", pogs_data->y[i]);
+    nrm = sqrtf(nrm);
+    Printf("final x nrm: %f", nrm);
+
+    nrm = 0;
+    for (int i = 0; i < m; ++i) {
+      nrm += pogs_data->y[i] * pogs_data->y[i];
     }
-    Printf("\n final l: %f", pogs_data->l[0]);
-    for (int i = 1; i < m; ++i) {
-      Printf(", %f", pogs_data->l[i]);
+    nrm = sqrtf(nrm);
+    Printf("final y nrm: %f", nrm);
+
+    nrm = 0;
+    for (int i = 0; i < m; ++i) {
+      nrm += pogs_data->l[i] * pogs_data->l[i];
     }
+    nrm = sqrtf(nrm);
+    Printf("final l nrm: %f", nrm);
   }
 
 #ifdef __OMPI_CUDA__
