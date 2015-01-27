@@ -567,7 +567,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cml::vector<T> yprev = cml::vector_subvector(&zprev, n_sub, m_sub);
 
   // For transfering values using mpi when we don't have OMPI CUDA
-#ifndef __OMPI_CUDA__
+#ifndef POGS_OMPI_CUDA
   std::vector<T> xh_h(n_sub);
   std::vector<T> xhtmp_h(n_sub);
 
@@ -713,7 +713,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     if (m_nodes > 1) {
       cml::vector_memcpy(&xhtmp, &x);
       cml::blas_axpy(d_hdl, -kOne, &xt, &xhtmp);
-#ifndef __OMPI_CUDA__
+#ifndef POGS_OMPI_CUDA
       cudaMemcpy(xhtmp_h.data(), xhtmp.data, xhtmp.size,
                  cudaMemcpyDeviceToHost);
       Allreduce(xhtmp_h.data(), xh_h.data(), xh_h.size(), MPI_SUM,
@@ -807,7 +807,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     if (m_sub == m) {
       cml::vector_memcpy(pogs_data->y, &y12);
     } else {
-#ifndef __OMPI_CUDA__
+#ifndef POGS_OMPI_CUDA
       cml::vector_memcpy(y12_h.data(), &y12);
       Gather(y12_h.data(), y12_h.size(), pogs_data->y, m_sub, 0,
              MPI_COMM_WORLD);
@@ -822,7 +822,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     if (n_sub == n) {
       cml::vector_memcpy(pogs_data->x, &x12);
     } else {
-#ifndef __OMPI_CUDA__
+#ifndef POGS_OMPI_CUDA
       cml::vector_memcpy(x12_h.data(), &x12);
       Gather(x12_h.data(), x12_h.size(), pogs_data->x, n_sub, 0,
              MPI_COMM_WORLD);
@@ -837,7 +837,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     if (m_sub == m) {
       cml::vector_memcpy(pogs_data->l, &y);
     } else {
-#ifndef __OMPI_CUDA__
+#ifndef POGS_OMPI_CUDA
       cml::vector_memcpy(y_h.data(), &y);
       Gather(y_h.data(), y_h.size(), pogs_data->l, m_sub, 0, MPI_COMM_WORLD);
 #else
@@ -876,7 +876,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     }
   }
 
-#ifdef __OMPI_CUDA__
+#ifdef POGS_OMPI_CUDA
   cml::matrix_free(&gather_buf);
   cml::vector_free(&identity);
   cml::vector_free(&x12final);

@@ -16,7 +16,7 @@ OMPI_CUDA=$(shell ompi_info --parsable -l 9 --all | \
 grep mpi_built_with_cuda_support:value:true)
 
 ifneq ($(strip $(OMPI_CUDA)),)
-MPI_CFLAGS+=-D__OMPI_CUDA__
+MPI_CFLAGS+=-DPOGS_OMPI_CUDA
 endif
 
 all: pogs.o pogs_cu_link.o pogs_cu.o pogs_sp_m_cu.o cml.o
