@@ -654,14 +654,14 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
   //double t = timer<double>();
   for (unsigned int k = 0; !err; ++k) {
-    double prox_time;
-    double global_z_time;
-    double global_z12_time;
-    double proj_time;
-    double primal_time;
-    double avg_time;
-    double dual_approx_time;
-    double dual_time;
+    double prox_time = 0;
+    double global_z_time = 0;
+    double global_z12_time = 0;
+    double proj_time = 0;
+    double primal_time = 0;
+    double avg_time = 0;
+    double dual_approx_time = 0;
+    double dual_time = 0;
 
     cml::vector_memcpy(&zprev, &z);
 
@@ -814,14 +814,12 @@ int Pogs(PogsData<T, M> *pogs_data) {
         delta = std::max(delta / kGamma, kDeltaMin);
       }
     }
-
-    Printf("TIME |   prox   | global_z | global_z12 |   proj   | primal  \n" \
-           "            %.3e       %.3e         %.3e       %.3e      %.3e\n" \
+    Printf("TIME |   prox   | global_z | global_z12 |    proj    | primal  \n" \
+           "      %.3e  %.3e  %.3e    %.3e      %.3e\n" \
            "     |   avg    | dual_approx |   dual   \n" \
-           "            %.3e          %.3e       %.3e\n",
+           "      %.3e  %.3e     %.3e\n",
            prox_time, global_z_time, global_z12_time, proj_time, primal_time,
            avg_time, dual_approx_time, dual_time);
-           
   }
   //Printf("TIME = %e\n", timer<double>() - t);
 
