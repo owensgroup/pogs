@@ -661,6 +661,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     // Compute dual variable.
     T nrm_r = 0, nrm_s = 0, gap, z_nrm, z12_nrm, temp;
     cml::blas_axpy(d_hdl, -kOne, &z12, &z);
+    cml::blas_axpy(d_hdl, -kOne, &x12, &xh);
     cml::blas_dot(d_hdl, &z, &z12, &gap);
     gap = std::abs(gap);
     pogs_data->optval = FuncEval(f, y12.data, 1) + FuncEval(g, x12.data, 1);
