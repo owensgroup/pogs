@@ -15,7 +15,7 @@
 #include "cml/cml_spmat.cuh"
 #include "cml/cml_vector.cuh"
 #include "pogs.h"
-//#include "timer.hpp"
+#include "timer.hpp"
 
 
 // Apply operator to h.a and h.d.
@@ -650,12 +650,23 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
   //double t = timer<double>();
   for (unsigned int k = 0; !err; ++k) {
+    double prox_time;
+    double global_z_time;
+    double global_z12_time;
+    double proj_time;
+    double primal_time;
+    double avg_time;
+    double dual_approx_time;
+    double dual_time;
+
     cml::vector_memcpy(&zprev, &z);
 
     // Evaluate Proximal Operators
+    prox_time = timer<double>();
     cml::blas_axpy(d_hdl, -kOne, &zt, &z);
     ProxEval(g, rho, xh.data, xh.stride, x12.data, x12.stride);
     ProxEval(f, rho, y.data, y.stride, y12.data, y12.stride);
+    prox_time = timer<double>() - prox_time;
 
     
     // Compute dual variable.
@@ -666,15 +677,19 @@ int Pogs(PogsData<T, M> *pogs_data) {
     gap = std::abs(gap);
     pogs_data->optval = FuncEval(f, y12.data, 1) + FuncEval(g, x12.data, 1);
 
+    global_z_time = timer<double>();
     // Calculate global z norm
     z_nrm = cml::blas_dot(d_hdl, &y, &y);
     Allreduce(&z_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
     z_nrm = sqrtf(cml::blas_dot(d_hdl, &xh, &xh) + temp);
+    global_z_time = timer<double>() - global_z_time;
 
+    global_z12_time = timer<double>();
     // Calculate global z12 norm
     z12_nrm = cml::blas_dot(d_hdl, &y12, &y12);
     Allreduce(&z12_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
     z12_nrm = sqrtf(cml::blas_dot(d_hdl, &x12, &x12) + temp);
+    global_z12_time = timer<double>() - global_z12_time;
     
     T eps_gap = std::sqrt(static_cast<T>(m + n)) * pogs_data->abs_tol +
         pogs_data->rel_tol * z_nrm * z12_nrm;
@@ -684,22 +699,26 @@ int Pogs(PogsData<T, M> *pogs_data) {
     if (converged || k == pogs_data->max_iter)
       break;
 
+    proj_time = timer<double>();
     // Project onto A_ij
     cml::vector_memcpy(&y, &y12);
     cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_NON_TRANSPOSE, descr, -kOne, &A,
         &x12, kOne, &y);
 
+    primal_time = timer<double>();
     // Compute primal residual
     nrm_r = cml::blas_dot(d_hdl, &y, &y);
     Allreduce(&nrm_r, &nrm_s, 1, MPI_SUM, MPI_COMM_WORLD);
     nrm_r = sqrtf(nrm_s);
     nrm_s = 0;
+    primal_time = timer<double>() - primal_time;
 
     cml::vector_set_all(&x, kZero);
     cml::spblas_solve(s_hdl, d_hdl, descr, &A, kOne, &y, &x, kTol, 5, true);
     cml::blas_axpy(d_hdl, kOne, &x12, &x);
     cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_NON_TRANSPOSE, descr, kOne, &A,
         &x, kZero, &y);
+    proj_time = timer<double>() - proj_time;
 
     // Apply over relaxation.
     cml::blas_scal(d_hdl, kAlpha, &z);
@@ -712,6 +731,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
     // Average
     if (m_nodes > 1) {
+      avg_time = timer<double>();
       cml::vector_memcpy(&xhtmp, &x);
       cml::blas_axpy(d_hdl, -kOne, &xt, &xhtmp);
 #ifndef POGS_OMPI_CUDA
@@ -727,19 +747,24 @@ int Pogs(PogsData<T, M> *pogs_data) {
                      &xh);
 #endif
       cml::blas_scal(d_hdl, 1.0 / m_nodes, &xh);
+      avg_time = timer<double>() - avg_time;
     }
 
     bool exact = false;
     cml::blas_axpy(d_hdl, -kOne, &zprev, &z12);
     cml::blas_axpy(d_hdl, -kOne, &z, &zprev);
 
+    
+    dual_approx_time = timer<double>();
     // Calculate global dual residual norm approximation
     z_nrm = cml::blas_dot(d_hdl, &yprev, &yprev);
     Allreduce(&z_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
     z_nrm = sqrtf(cml::blas_dot(d_hdl, &xprev, &xprev) + temp);
+    dual_approx_time = timer<double>() - dual_approx_time;
 
     nrm_s = rho * z_nrm;
     if (nrm_r < eps_pri && nrm_s < eps_dua) {
+      dual_time = timer<double>();
       // Calculate global A'y12 + x12
       cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_TRANSPOSE, descr, kOne, &A,
           &y12, kOne, &x12);
@@ -747,6 +772,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
       Allreduce(&nrm_s, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
       nrm_s = rho * sqrtf(temp);
       exact = true;
+      dual_time = timer<double>() - dual_time;
     }
 
     // Evaluate stopping criteria.
@@ -784,6 +810,14 @@ int Pogs(PogsData<T, M> *pogs_data) {
         delta = std::max(delta / kGamma, kDeltaMin);
       }
     }
+
+    Printf("TIME |   prox   | global_z | global_z12 |   proj   | primal  \n" \
+           "            %.3e       %.3e         %.3e       %.3e      %.3e\n" \
+           "     |   avg    | dual_approx |   dual   \n" \
+           "            %.3e          %.3e       %.3e\n",
+           prox_time, global_z_time, global_z12_time, proj_time, primal_time,
+           avg_time, dual_approx_time, dual_time);
+           
   }
   //Printf("TIME = %e\n", timer<double>() - t);
 
