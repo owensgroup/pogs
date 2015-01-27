@@ -448,7 +448,11 @@ int Pogs(PogsData<T, M> *pogs_data) {
   MPI_Comm_size(MPI_COMM_WORLD, &kNodes);
 
   // Set GPU device
-  cudaSetDevice(kLocalRank);
+  int kDeviceCount;
+  cudaGetDeviceCount(&kDeviceCount);
+  // If we have more blocks on a node then GPUs then allocate those blocks in
+  // a round robin fashion
+  cudaSetDevice(kLocalRank % kDeviceCount);
 
   // Transfer pogs meta data
   //MPI_Bcast(&pogs_data->A.nnz, sizeof(M::I_t), MPI_BYTE, 0, MPI_COMM_WORLD);
