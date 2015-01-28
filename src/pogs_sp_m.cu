@@ -2,7 +2,7 @@
 #include <cusparse.h>
 #include <cublas_v2.h>
 
-#include "sinkhorn_knopp.cuh"
+#include "sinkhorn_knopp_m.cuh"
 
 #include <cstdlib>
 #include <cmath>
@@ -16,7 +16,7 @@
 #include "cml/cml_vector.cuh"
 #include "pogs.h"
 #include "timer.hpp"
-
+#include "mpi_util.h"
 
 // Apply operator to h.a and h.d.
 template <typename T, typename Op>
@@ -59,63 +59,6 @@ void RecvFunctionObj(std::vector<FunctionObj<T> > &fos) {
   fos.push_back(FunctionObj<T>(h, a, b, c, d, e));
 }
 
-///////////////////////////////////////////////////////////////////////////////
-/// Templated MPI functions
-///////////////////////////////////////////////////////////////////////////////
-
-inline int Allreduce(float *send,
-                     float *recv,
-                     int count,
-                     MPI_Op op,
-                     MPI_Comm comm) {
-  return MPI_Allreduce(send, recv, count, MPI_FLOAT, op, comm);
-}
-
-inline int Allreduce(double *send,
-                     double *recv,
-                     int count,
-                     MPI_Op op,
-                     MPI_Comm comm) {
-  return MPI_Allreduce(send, recv, count, MPI_DOUBLE, op, comm);
-}
-
-inline int Allgather(float *send,
-                     int send_count,
-                     float *recv,
-                     int recv_count,
-                     MPI_Comm comm) {
-  return MPI_Allgather(send, send_count, MPI_FLOAT, recv, recv_count, MPI_FLOAT,
-                       comm);
-};
-
-inline int Allgather(double *send,
-                     int send_count,
-                     double *recv,
-                     int recv_count,
-                     MPI_Comm comm) {
-  return MPI_Allgather(send, send_count, MPI_DOUBLE, recv, recv_count,
-                       MPI_DOUBLE, comm);
-};
-
-inline int Gather(float *send,
-                  int send_count,
-                  float *recv,
-                  int recv_count,
-                  int root,
-                  MPI_Comm comm) {
-  return MPI_Gather(send, send_count, MPI_FLOAT, recv, recv_count, MPI_FLOAT,
-                    root, comm);
-};
-
-inline int Gather(double *send,
-                  int send_count,
-                  double *recv,
-                  int recv_count,
-                  int root,
-                  MPI_Comm comm) {
-  return MPI_Gather(send, send_count, MPI_DOUBLE, recv, recv_count, MPI_DOUBLE,
-                    root, comm);
-};
 
 ////////////////////////
 
@@ -547,7 +490,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
         pogs_data->factors.ind, pogs_data->factors.ptr, m, n,
         pogs_data->factors.nnz);
   } else {
-    de = cml::vector_calloc<T>(m_sub + n_sub);
+    de = cml::vector_calloc<T>(m + n);
     z = cml::vector_calloc<T>(m_sub + n_sub);
     zt = cml::vector_calloc<T>(m_sub + n_sub);
     A = cml::spmat_alloc<T, typename M::I_t, kOrd>(m_sub, n_sub, nnz_sub);
@@ -559,8 +502,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
   }
 
   // Create views for x and y components.
-  cml::vector<T> d = cml::vector_subvector(&de, 0, m_sub);
-  cml::vector<T> e = cml::vector_subvector(&de, m_sub, n_sub);
+  cml::vector<T> d = cml::vector_subvector(&de, 0, m);
+  cml::vector<T> e = cml::vector_subvector(&de, m, n);
   cml::vector<T> x = cml::vector_subvector(&z, 0, n_sub);
   cml::vector<T> y = cml::vector_subvector(&z, n_sub, m_sub);
   cml::vector<T> x12 = cml::vector_subvector(&z12, 0, n_sub);
@@ -591,8 +534,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
   if (pre_process && !err) {
     cml::spmat_memcpy(s_hdl, &A, A_ij.val, A_ij.ind, A_ij.ptr);
-    // Avoid equilibration for now
-    //err = sinkhorn_knopp::Equilibrate(s_hdl, d_hdl, descr, &A, &d, &e);
+    err = sinkhorn_knopp::Equilibrate(s_hdl, d_hdl, descr, &A, &d, &e, m, n,
+                                      i_A);
 
     if (!err) {
       // TODO: Issue warning if x == NULL or y == NULL
@@ -631,14 +574,14 @@ int Pogs(PogsData<T, M> *pogs_data) {
   // todo(abp): figure out how e and d work with Block splitting
 
   // Scale f and g to account for diagonal scaling e and d.
-  /*
-    if (!err) {
+  
+  if (!err) {
     thrust::transform(f.begin(), f.end(), thrust::device_pointer_cast(d.data),
     f.begin(), ApplyOp<T, thrust::divides<T> >(thrust::divides<T>()));
     thrust::transform(g.begin(), g.end(), thrust::device_pointer_cast(e.data),
     g.begin(), ApplyOp<T, thrust::multiplies<T> >(thrust::multiplies<T>()));
-    }
-  */
+  }
+  
 
   // Signal start of execution.
   if (!pogs_data->quiet)
@@ -684,14 +627,14 @@ int Pogs(PogsData<T, M> *pogs_data) {
     global_z_time = timer<double>();
     // Calculate global z norm
     z_nrm = cml::blas_dot(d_hdl, &y, &y);
-    Allreduce(&z_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
+    mpiu::Allreduce(&z_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
     z_nrm = sqrtf(cml::blas_dot(d_hdl, &xh, &xh) + temp);
     global_z_time = timer<double>() - global_z_time;
 
     global_z12_time = timer<double>();
     // Calculate global z12 norm
     z12_nrm = cml::blas_dot(d_hdl, &y12, &y12);
-    Allreduce(&z12_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
+    mpiu::Allreduce(&z12_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
     z12_nrm = sqrtf(cml::blas_dot(d_hdl, &x12, &x12) + temp);
     global_z12_time = timer<double>() - global_z12_time;
     
@@ -712,7 +655,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     primal_time = timer<double>();
     // Compute primal residual
     nrm_r = cml::blas_dot(d_hdl, &y, &y);
-    Allreduce(&nrm_r, &nrm_s, 1, MPI_SUM, MPI_COMM_WORLD);
+    mpiu::Allreduce(&nrm_r, &nrm_s, 1, MPI_SUM, MPI_COMM_WORLD);
     nrm_r = sqrtf(nrm_s);
     nrm_s = 0;
     primal_time = timer<double>() - primal_time;
@@ -741,11 +684,12 @@ int Pogs(PogsData<T, M> *pogs_data) {
 #ifndef POGS_OMPI_CUDA
       cudaMemcpy(xhtmp_h.data(), xhtmp.data, xhtmp.size,
                  cudaMemcpyDeviceToHost);
-      Allreduce(xhtmp_h.data(), xh_h.data(), xh_h.size(), MPI_SUM,
-                MPI_COMM_WORLD);
+      mpiu::Allreduce(xhtmp_h.data(), xh_h.data(), xh_h.size(), MPI_SUM,
+                      MPI_COMM_WORLD);
       cudaMemcpy(xh.data, xh_h.data(), xh_h.size(), cudaMemcpyHostToDevice);
 #else
-      Allgather(xhtmp.data, xhtmp.size, gather_buf.data, xhtmp.size,
+      cudaDeviceSynchronize();
+      mpiu::Allgather(xhtmp.data, xhtmp.size, gather_buf.data, xhtmp.size,
                 MPI_COMM_WORLD);
       cml::blas_gemv(d_hdl, CUBLAS_OP_T, kOne, &gather_buf, &identity, kZero,
                      &xh);
@@ -762,7 +706,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     dual_approx_time = timer<double>();
     // Calculate global dual residual norm approximation
     z_nrm = cml::blas_dot(d_hdl, &yprev, &yprev);
-    Allreduce(&z_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
+    mpiu::Allreduce(&z_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
     z_nrm = sqrtf(cml::blas_dot(d_hdl, &xprev, &xprev) + temp);
     dual_approx_time = timer<double>() - dual_approx_time;
 
@@ -773,7 +717,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
       cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_TRANSPOSE, descr, kOne, &A,
           &y12, kOne, &x12);
       nrm_s = cml::blas_dot(d_hdl, &x12, &x12);
-      Allreduce(&nrm_s, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
+      mpiu::Allreduce(&nrm_s, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
       nrm_s = rho * sqrtf(temp);
       exact = true;
       dual_time = timer<double>() - dual_time;
@@ -824,10 +768,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
   //Printf("TIME = %e\n", timer<double>() - t);
 
 
-  // Scale x, y and l for output.
-  // cml::vector_div(&y12, &d);
-  // cml::vector_mul(&x12, &e);
-  // cml::vector_mul(&y, &d);
   cml::blas_scal(d_hdl, rho, &y);
 
   // Copy results to output.
@@ -840,16 +780,23 @@ int Pogs(PogsData<T, M> *pogs_data) {
   //               This would eliminate the memcpy. Assuming for now that
   //               it is only gpu->gpu or host->host.
 
+  // Scale x, y and l for output.
   if (pogs_data->y != 0 && !err) {
     if (m_sub == m) {
+      cml::vector_div(&y12, &d);
       cml::vector_memcpy(pogs_data->y, &y12);
     } else {
 #ifndef POGS_OMPI_CUDA
+      // NOT FUNCTIONAL RIGHT NOW
+      exit(-1);
       cml::vector_memcpy(y12_h.data(), &y12);
-      Gather(y12_h.data(), y12_h.size(), pogs_data->y, m_sub, 0,
+      mpiu::Gather(y12_h.data(), y12_h.size(), pogs_data->y, m_sub, 0,
              MPI_COMM_WORLD);
 #else
-      Gather(y12.data, y12.size, y12final.data, y12.size, 0, MPI_COMM_WORLD);
+      cudaDeviceSynchronize();
+      mpiu::Gather(y12.data, y12.size, y12final.data, y12.size, 0,
+                      MPI_COMM_WORLD);
+      cml::vector_div(&y12final, &d);
       cml::vector_memcpy(pogs_data->y, &y12final);
 #endif
     }
@@ -857,14 +804,20 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
   if (pogs_data->x != 0 && !err) {
     if (n_sub == n) {
+      cml::vector_mul(&x12, &e);
       cml::vector_memcpy(pogs_data->x, &x12);
     } else {
 #ifndef POGS_OMPI_CUDA
+      // NOT FUNCTIONAL RIGHT NOW BECAUSE NO SCALING
+      exit(-1);
       cml::vector_memcpy(x12_h.data(), &x12);
-      Gather(x12_h.data(), x12_h.size(), pogs_data->x, n_sub, 0,
+      mpiu::Gather(x12_h.data(), x12_h.size(), pogs_data->x, n_sub, 0,
              MPI_COMM_WORLD);
 #else
-      Gather(x12.data, x12.size, x12final.data, x12.size, 0, MPI_COMM_WORLD);
+      cudaDeviceSynchronize();
+      mpiu::Gather(x12.data, x12.size, x12final.data, x12.size, 0,
+                   MPI_COMM_WORLD);
+      cml::vector_mul(&x12final, &e);
       cml::vector_memcpy(pogs_data->x, &x12final);
 #endif
     }
@@ -872,13 +825,18 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
   if (pogs_data->l != 0 && !err) {
     if (m_sub == m) {
+      cml::vector_mul(&y, &d);
       cml::vector_memcpy(pogs_data->l, &y);
     } else {
 #ifndef POGS_OMPI_CUDA
+      //NOT FUNCTIONAL BECAUSE NO SCALING
+      exit(-1);
       cml::vector_memcpy(y_h.data(), &y);
-      Gather(y_h.data(), y_h.size(), pogs_data->l, m_sub, 0, MPI_COMM_WORLD);
+      mpiu::Gather(y_h.data(), y_h.size(), pogs_data->l, m_sub, 0, MPI_COMM_WORLD);
 #else
-      Gather(y.data, y.size, yfinal.data, y.size, 0, MPI_COMM_WORLD);
+      cudaDeviceSynchronize();
+      mpiu::Gather(y.data, y.size, yfinal.data, y.size, 0, MPI_COMM_WORLD);
+      cml::vector_mul(&yfinal, &d);
       cml::vector_memcpy(pogs_data->l, &yfinal);
 #endif
     }
