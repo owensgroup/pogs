@@ -1,18 +1,23 @@
 # User Vars
 
 # C++ Flags
-CXX=g++
+CXX=g++-4.8
 CXXFLAGS=-g -O3 -Wall -Wconversion -std=c++11
 
 # CUDA Flags
 CUXX=nvcc
-CUFLAGS=-arch=sm_20 -Xcompiler -fPIC -D__STRICT_ANSI__
+CUFLAGS=-arch=sm_20 -Xcompiler -fPIC -D__STRICT_ANSI__ -ccbin $(CXX)
 
 # MPI Flags
 MPI_CFLAGS = $(shell mpic++ --showme:compile)
 MPI_LFLAGS = $(shell mpic++ --showme:link)
 
-OMPI_CUDA=$(shell ompi_info --parsable -l 9 --all | \
+MPI_ROOT=/usr/local/openmpi
+MPI_CFLAGS=-I$(MPI_ROOT)/include 
+MPI_LFLAGS=-Xlinker -rpath -Xlinker $(MPI_ROOT)/lib -Xlinker \
+--enable-new-dtags -L$(MPI_ROOT)/lib -lmpi_cxx -lmpi
+
+OMPI_CUDA=$(shell ompi_info --parsable --all | \
 grep mpi_built_with_cuda_support:value:true)
 
 ifneq ($(strip $(OMPI_CUDA)),)
