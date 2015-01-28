@@ -6,11 +6,17 @@
 typedef double real_t;
 
 int main(int argc, char **argv) {
-  MPI_Init(NULL, NULL);
+  int m_nodes = 4;
+  
+  MPI_Init(&argc, &argv);
+  
+  if (argc == 2) {
+    m_nodes = atoi(argv[1]);
+  }
 
   double t;
   printf("\nLasso.\n");
-  t = Lasso<real_t>(1000, 100, 10000);
+  t = Lasso<real_t>(100000, 100, 1000000, m_nodes);
 //  t = Lasso<real_t>(10000, 10000000, 200000000);
   printf("Solver Time: %e sec\n", t);
 

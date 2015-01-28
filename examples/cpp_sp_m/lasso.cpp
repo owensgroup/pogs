@@ -11,7 +11,7 @@
 //
 // See <pogs>/matlab/examples/lasso.m for detailed description.
 template <typename T>
-double Lasso(int m, int n, int nnz) {
+double Lasso(int m, int n, int nnz, int m_nodes) {
   int kRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
 
@@ -28,6 +28,8 @@ double Lasso(int m, int n, int nnz) {
     b.resize(m);
 
     std::default_random_engine generator;
+    generator.seed(0);
+    srand(10);
     std::normal_distribution<T> n_dist(static_cast<T>(0),
                                        static_cast<T>(1));
  
@@ -46,7 +48,7 @@ double Lasso(int m, int n, int nnz) {
   PogsData<T, Sparse<T, int, ROW>> pogs_data(A_, m, n);
   pogs_data.x = x.data();
   pogs_data.y = y.data();
-  pogs_data.m_nodes = 2;
+  pogs_data.m_nodes = m_nodes;
   pogs_data.n_nodes = 1;
 
   if (kRank == 0) {
@@ -65,6 +67,6 @@ double Lasso(int m, int n, int nnz) {
   return timer<double>() - t;
 }
 
-template double Lasso<double>(int m, int n, int nnz);
-template double Lasso<float>(int m, int n, int nnz);
+template double Lasso<double>(int m, int n, int nnz, int m_nodes);
+template double Lasso<float>(int m, int n, int nnz, int m_nodes);
 

@@ -4,7 +4,7 @@
 #include <cstdlib>
 
 template <typename T>
-double Lasso(int m, int n, int nnz);
+double Lasso(int m, int n, int nnz, int m_nodes);
 
 template <typename T>
 double LassoPath(int m, int n, int nnz);
