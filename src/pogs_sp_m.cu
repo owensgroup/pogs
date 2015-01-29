@@ -374,6 +374,7 @@ void SendSubMatrices(PogsData<T, M> *pogs_data, M &A) {
 // Proximal Operator Graph Solver.
 template<typename T, typename M>
 int Pogs(PogsData<T, M> *pogs_data) {
+  double total_time = timer<double>();
   // Constants for adaptive-rho and over-relaxation.
   const T kDeltaMin = static_cast<T>(1.05);
   const T kGamma = static_cast<T>(1.01);
@@ -401,7 +402,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cudaSetDevice(kLocalRank % kDeviceCount);
 
   // Transfer pogs meta data
-  //MPI_Bcast(&pogs_data->A.nnz, sizeof(M::I_t), MPI_BYTE, 0, MPI_COMM_WORLD);
+  double bcast_time = timer<double>();
   int nnz = pogs_data->A.nnz;
   MPI_Bcast(&nnz, sizeof(typename M::I_t), MPI_BYTE, 0, MPI_COMM_WORLD);
   MPI_Bcast(&pogs_data->m, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
@@ -439,11 +440,13 @@ int Pogs(PogsData<T, M> *pogs_data) {
   int n_sub = n / n_nodes;
   Printf("Sub matrix size: %d x %d\n", m_sub, n_sub);
 
+  double send_sub_time = timer<double>();
   M A_ij(new T[nnz],
          new typename M::I_t[M::Ord == ROW ? m_sub + 1 : n_sub + 1],
          new typename M::I_t[nnz],
          nnz);
   SendSubMatrices(pogs_data, A_ij);
+  printf("Send sub time: %.3e\n", timer<double>() - send_sub_time);
 
   int nnz_sub = A_ij.nnz;
   Printf("Sub matrix nnz: %d\n", nnz_sub);
@@ -473,6 +476,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cudaStreamCreate(&aij_s);
 
   // Allocate data for ADMM variables.
+  double malloc_time = timer<double>();
   bool pre_process = true;
   cml::vector<T> de, z, zt;
   cml::vector<T> zprev = cml::vector_calloc<T>(m_sub + n_sub);
@@ -602,7 +606,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   unsigned int kd = 0, ku = 0;
   bool converged = false;
 
-  //double t = timer<double>();
+  double t = timer<double>();
   for (unsigned int k = 0; !err; ++k) {
     double prox_time = 0;
     double global_z_time = 0;
@@ -634,6 +638,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     global_z_time = timer<double>();
     // Calculate global z norm
     z_nrm = cml::blas_dot(d_hdl, &y, &y);
+    cudaDeviceSynchronize();
     mpiu::Allreduce(&z_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
     z_nrm = sqrtf(cml::blas_dot(d_hdl, &xh, &xh) + temp);
     global_z_time = timer<double>() - global_z_time;
@@ -641,6 +646,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     global_z12_time = timer<double>();
     // Calculate global z12 norm
     z12_nrm = cml::blas_dot(d_hdl, &y12, &y12);
+    cudaDeviceSynchronize();
     mpiu::Allreduce(&z12_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
     z12_nrm = sqrtf(cml::blas_dot(d_hdl, &x12, &x12) + temp);
     global_z12_time = timer<double>() - global_z12_time;
@@ -662,6 +668,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     primal_time = timer<double>();
     // Compute primal residual
     nrm_r = cml::blas_dot(d_hdl, &y, &y);
+    cudaDeviceSynchronize();
     mpiu::Allreduce(&nrm_r, &nrm_s, 1, MPI_SUM, MPI_COMM_WORLD);
     nrm_r = sqrtf(nrm_s);
     nrm_s = 0;
@@ -713,6 +720,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_TRANSPOSE, descr, kOne, &A,
                      &y12, kOne, &x12);
     nrm_s = cml::blas_dot(d_hdl, &x12, &x12);
+    cudaDeviceSynchronize();
     mpiu::Allreduce(&nrm_s, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
     nrm_s = rho * sqrtf(temp);
     dual_time = timer<double>() - dual_time;
@@ -896,6 +904,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
   delete A_ij.val;
   delete A_ij.ptr;
   delete A_ij.ind;
+
+  printf("TOTAL TIME: %.3e\n", timer<double>() - total_time);
 
   return err;
 }
