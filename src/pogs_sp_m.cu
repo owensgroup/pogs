@@ -402,6 +402,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
   // Transfer pogs meta data
   //MPI_Bcast(&pogs_data->A.nnz, sizeof(M::I_t), MPI_BYTE, 0, MPI_COMM_WORLD);
+  int nnz = pogs_data->A.nnz;
+  MPI_Bcast(&nnz, sizeof(typename M::I_t), MPI_BYTE, 0, MPI_COMM_WORLD);
   MPI_Bcast(&pogs_data->m, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
   MPI_Bcast(&pogs_data->n, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
   MPI_Bcast(&pogs_data->m_nodes, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
@@ -418,7 +420,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   MPI_Bcast(&pogs_data->init_y, sizeof(bool), MPI_BYTE, 0, MPI_COMM_WORLD);
 
   // Extract meta data from pogs_data
-  int m = pogs_data->m, n = pogs_data->n, nnz = pogs_data->A.nnz;
+  int m = pogs_data->m, n = pogs_data->n;
   int m_nodes = pogs_data->m_nodes, n_nodes = pogs_data->n_nodes;
   T rho = pogs_data->rho;
 
@@ -438,9 +440,10 @@ int Pogs(PogsData<T, M> *pogs_data) {
   Printf("Sub matrix size: %d x %d\n", m_sub, n_sub);
 
   M A_ij(new T[m_sub * n_sub],
+  M A_ij(new T[nnz],
          new typename M::I_t[M::Ord == ROW ? m_sub + 1 : n_sub + 1],
-         new typename M::I_t[m_sub * n_sub],
-         m_sub * n_sub);
+         new typename M::I_t[nnz],
+         nnz);
   SendSubMatrices(pogs_data, A_ij);
 
   int nnz_sub = A_ij.nnz;
