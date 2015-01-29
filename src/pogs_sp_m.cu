@@ -439,7 +439,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
   int n_sub = n / n_nodes;
   Printf("Sub matrix size: %d x %d\n", m_sub, n_sub);
 
-  M A_ij(new T[m_sub * n_sub],
   M A_ij(new T[nnz],
          new typename M::I_t[M::Ord == ROW ? m_sub + 1 : n_sub + 1],
          new typename M::I_t[nnz],
