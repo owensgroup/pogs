@@ -305,11 +305,11 @@ int Equilibrate(cusparseHandle_t s_hdl, cublasHandle_t b_hdl,
   // Gather d on each node
 #ifndef POGS_OMPI_CUDA
   cudaMemcpy(d_h.data(), d->data, d->size, cudaMemcpyDeviceToHost);
-  mpiu::Allgather(static_cast<T*>(MPI_IN_PLACE), 0, d_h.data(), d_h.size(),
+  mpiu::Allgather(static_cast<T*>(MPI_IN_PLACE), 0, d_h.data(), d_sub.size,
       MPI_COMM_WORLD);
   cudaMemcpy(d.data, d_h.data(), d_h.size(), cudaMemcpyHostToDevice);
 #else
-  mpiu::Allgather(static_cast<T*>(MPI_IN_PLACE), 0, d->data, d->size,
+  mpiu::Allgather(static_cast<T*>(MPI_IN_PLACE), 0, d->data, d_sub.size,
       MPI_COMM_WORLD);
 #endif
 
