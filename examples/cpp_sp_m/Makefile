@@ -10,7 +10,7 @@ CXX=g++-4.8
 CXXFLAGS=-g -O3 -I$(POGSROOT) -std=c++11 -Wall -Wconversion  
 
 # CUDA Flags
-CULDFLAGS_=-lcudart -lcublas -lcusparse
+CULDFLAGS_=-lcudart -lcublas -lcusparse -I$(CUDAROOT)/include
 CUXXFLAGS=-D__CUDA
 
 # MPI Flags

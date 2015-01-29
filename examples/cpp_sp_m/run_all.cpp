@@ -1,5 +1,7 @@
 #include <cstdio>
 #include <mpi.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
 
 #include "examples.h"
 
@@ -13,6 +15,11 @@ int main(int argc, char **argv) {
   if (argc == 2) {
     m_nodes = atoi(argv[1]);
   }
+
+  // CUDA sometimes takes a long time on the first API call
+  // We set device here so that we avoid measuring that setup time as
+  // part of the measurement
+  cudaSetDevice(0);
 
   double t;
   printf("\nLasso.\n");
