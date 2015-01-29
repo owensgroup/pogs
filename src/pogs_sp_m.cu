@@ -753,14 +753,15 @@ int Pogs(PogsData<T, M> *pogs_data) {
         delta = std::max(delta / kGamma, kDeltaMin);
       }
     }
-    Printf("TIME |   prox   | global_z | global_z12 |    proj    | primal  \n" \
-           "      %.3e  %.3e  %.3e    %.3e      %.3e\n" \
-           "     |   avg    | dual_approx |   dual   \n" \
-           "      %.3e  %.3e     %.3e\n",
-           prox_time, global_z_time, global_z12_time, proj_time, primal_time,
-           avg_time, dual_approx_time, dual_time);
+    if (!pogs_data->quiet)
+      Printf("TIME |   prox   | global_z | global_z12 |    proj   | primal \n" \
+             "      %.3e  %.3e  %.3e    %.3e     %.3e\n" \
+             "     |   avg    | dual_approx |   dual   \n" \
+             "      %.3e  %.3e     %.3e\n",
+             prox_time, global_z_time, global_z12_time, proj_time, primal_time,
+             avg_time, dual_approx_time, dual_time);
   }
-  //Printf("TIME = %e\n", timer<double>() - t);
+  Printf("TIME = %e\n", timer<double>() - t);
 
 
   cml::blas_scal(d_hdl, rho, &y);
