@@ -509,6 +509,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
   // Create views for x and y components.
   cml::vector<T> d = cml::vector_subvector(&de, 0, m);
+  cml::vector<T> d_sub = cml::vector_subvector(&d, i_A * m_sub, m_sub);
   cml::vector<T> e = cml::vector_subvector(&de, m, n);
   cml::vector<T> x = cml::vector_subvector(&z, 0, n_sub);
   cml::vector<T> y = cml::vector_subvector(&z, n_sub, m_sub);
@@ -582,7 +583,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
   // Scale f and g to account for diagonal scaling e and d.
   
   if (!err) {
-    thrust::transform(f.begin(), f.end(), thrust::device_pointer_cast(d.data),
+    thrust::transform(f.begin(), f.end(),
+                      thrust::device_pointer_cast(d_sub.data),
     f.begin(), ApplyOp<T, thrust::divides<T> >(thrust::divides<T>()));
     thrust::transform(g.begin(), g.end(), thrust::device_pointer_cast(e.data),
     g.begin(), ApplyOp<T, thrust::multiplies<T> >(thrust::multiplies<T>()));
