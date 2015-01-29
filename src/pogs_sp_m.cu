@@ -698,33 +698,20 @@ int Pogs(PogsData<T, M> *pogs_data) {
       avg_time = timer<double>() - avg_time;
     }
 
-    bool exact = false;
     cml::blas_axpy(d_hdl, -kOne, &zprev, &z12);
     cml::blas_axpy(d_hdl, -kOne, &z, &zprev);
-
     
-    dual_approx_time = timer<double>();
-    // Calculate global dual residual norm approximation
-    z_nrm = cml::blas_dot(d_hdl, &yprev, &yprev);
-    mpiu::Allreduce(&z_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
-    z_nrm = sqrtf(cml::blas_dot(d_hdl, &xprev, &xprev) + temp);
-    dual_approx_time = timer<double>() - dual_approx_time;
-
-    nrm_s = rho * z_nrm;
-    if (nrm_r < eps_pri && nrm_s < eps_dua) {
-      dual_time = timer<double>();
-      // Calculate global A'y12 + x12
-      cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_TRANSPOSE, descr, kOne, &A,
-          &y12, kOne, &x12);
-      nrm_s = cml::blas_dot(d_hdl, &x12, &x12);
-      mpiu::Allreduce(&nrm_s, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
-      nrm_s = rho * sqrtf(temp);
-      exact = true;
-      dual_time = timer<double>() - dual_time;
-    }
+    dual_time = timer<double>();
+    // Calculate global A'y12 + x12
+    cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_TRANSPOSE, descr, kOne, &A,
+                     &y12, kOne, &x12);
+    nrm_s = cml::blas_dot(d_hdl, &x12, &x12);
+    mpiu::Allreduce(&nrm_s, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
+    nrm_s = rho * sqrtf(temp);
+    dual_time = timer<double>() - dual_time;
 
     // Evaluate stopping criteria.
-    converged = exact && nrm_r < eps_pri && nrm_s < eps_dua &&
+    converged = nrm_r < eps_pri && nrm_s < eps_dua &&
         (!pogs_data->gap_stop || gap < eps_gap);
     if (!pogs_data->quiet && (k % 10 == 0 || converged))
       Printf("%4d :  %.3e  %.3e  %.3e  %.3e  %.3e  %.3e  %.3e\n",
