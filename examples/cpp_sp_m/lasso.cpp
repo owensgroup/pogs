@@ -5,6 +5,7 @@
 #include "mat_gen.h"
 #include "pogs.h"
 #include "timer.h"
+#include "util.h"
 
 // Lasso
 //   minimize    (1/2) ||Ax - b||_2^2 + \lambda ||x||_1
@@ -21,15 +22,15 @@ double Lasso(int m, int n, int nnz, int m_nodes) {
   std::vector<T> b;
   std::vector<T> x(n);
   std::vector<T> y(m);
-  if (kRank == 0) {
+  MASTER(kRank) {
     val.resize(nnz);
     col_ind.resize(nnz);
     row_ptr.resize(m + 1);
     b.resize(m);
 
     std::default_random_engine generator;
-    generator.seed(0);
-    srand(10);
+    generator.seed(1240);
+    srand(12410);
     std::normal_distribution<T> n_dist(static_cast<T>(0),
                                        static_cast<T>(1));
  
@@ -39,7 +40,6 @@ double Lasso(int m, int n, int nnz, int m_nodes) {
 
     for (unsigned int i = 0; i < m; ++i)
       b[i] = static_cast<T>(4) * n_dist(generator);
-
   }
 
   T lambda_max = 5;
@@ -50,8 +50,9 @@ double Lasso(int m, int n, int nnz, int m_nodes) {
   pogs_data.y = y.data();
   pogs_data.m_nodes = m_nodes;
   pogs_data.n_nodes = 1;
+  pogs_data.quiet = true;
 
-  if (kRank == 0) {
+  MASTER(kRank) {
     pogs_data.f.reserve(m);
     for (unsigned int i = 0; i < m; ++i)
       pogs_data.f.emplace_back(kSquare, static_cast<T>(1), b[i]);

@@ -4,13 +4,16 @@
 #include <cuda_runtime.h>
 
 #include "examples.h"
+#include "util.h"
 
 typedef double real_t;
 
 int main(int argc, char **argv) {
   int m_nodes = 4;
+  int kRank;
   
   MPI_Init(&argc, &argv);
+  MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
   
   if (argc == 2) {
     m_nodes = atoi(argv[1]);
@@ -22,23 +25,35 @@ int main(int argc, char **argv) {
   cudaSetDevice(0);
 
   double t;
-  printf("\nLasso.\n");
-  t = Lasso<real_t>(100000, 100, 1000000, m_nodes);
+  MASTER(kRank) {
+    printf("\nLasso.\n");
+  }
+  t = Lasso<real_t>(1000, 10000, 100000, m_nodes);
 //  t = Lasso<real_t>(10000, 10000000, 200000000);
-  printf("Solver Time: %e sec\n", t);
+  MASTER(kRank) {
+    printf("Solver Time: %e sec\n", t);
+  }
 
-  printf("\nLasso Path.\n");
-  t = LassoPath<real_t>(200, 1000, 10000);
-  printf("Solver Time: %e sec\n", t);
+  MASTER(kRank) {
+    printf("\nLasso Path.\n");
+  }
+  //t = LassoPath<real_t>(200, 1000, 10000, m_nodes);
+  MASTER(kRank) {
+    printf("Solver Time: %e sec\n", t);
+  }
 
 //   printf("\nLogistic Regression.\n");
 //   t = Logistic<real_t>(1000, 100);
 //   printf("Solver Time: %e sec\n", t);
 
-  printf("\nLinear Program in Equality Form.\n");
-//  t = LpEq<real_t>(100000, 10000000, 200000000);
-  t = LpEq<real_t>(200, 1000, 10000);
-  printf("Solver Time: %e sec\n", t);
+  MASTER(kRank) {
+    printf("\nLinear Program in Equality Form.\n");
+  }
+  //t = LpEq<real_t>(100000, 10000000, 200000000, m_nodes);
+    t = LpEq<real_t>(2000, 1000, 100000, m_nodes);
+  MASTER(kRank) {
+    printf("Solver Time: %e sec\n", t);
+  }
 
 //   printf("\nLinear Program in Inequality Form.\n");
 //   t = LpIneq<real_t>(1000, 200);
