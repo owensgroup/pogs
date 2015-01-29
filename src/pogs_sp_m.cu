@@ -104,11 +104,12 @@ struct SendSubMatricesHelper<T, I, ROW> {
             node = curr_i_A + curr_j_A * n_nodes;
             // Find this block's portion of the row
             while (i != row_end) {
-              if (pogs_data->A.ind[i] > (curr_i_A + 1) * m_sub) {
+              if (pogs_data->A.ind[i] > (curr_i_A + 1) * n_sub) {
                 break;
               }
               i++;
             }
+
             MPI_Isend(pogs_data->A.val + stripe_begin,
                       (i - stripe_begin) * sizeof(T),
                       MPI_BYTE,
@@ -170,6 +171,7 @@ struct SendSubMatricesHelper<T, I, ROW> {
     MPI_Status row_status;
 
     // Receive A_ij matrix 
+    ptr[0] = 0;
     for (int stripes = 0; stripes < m_sub; ++stripes) {
       MPI_Recv(val, n_sub * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
                MPI_COMM_WORLD,
@@ -252,7 +254,7 @@ struct SendSubMatricesHelper<T, I, COL> {
             node = curr_j_A + curr_i_A * m_nodes;
             // Find this block's portion of the row
             while (i != col_end) {
-              if (pogs_data->A.ind[i] > (curr_j_A + 1) * n_sub) {
+              if (pogs_data->A.ind[i] > (curr_j_A + 1) * m_sub) {
                 break;
               }
               i++;
@@ -316,6 +318,7 @@ struct SendSubMatricesHelper<T, I, COL> {
     MPI_Status col_status;
 
     // Receive A_ij matrix 
+    ptr[0] = 0;
     for (int stripes = 0; stripes < n_sub; ++stripes) {
       MPI_Recv(val, m_sub * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
                MPI_COMM_WORLD,
