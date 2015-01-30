@@ -544,8 +544,9 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
   if (pre_process && !err) {
     cml::spmat_memcpy(s_hdl, &A, A_ij.val, A_ij.ind, A_ij.ptr);
-    err = sinkhorn_knopp::Equilibrate(s_hdl, d_hdl, descr, &A, &d, &e, m, n,
-                                      i_A);
+    cml::vector_set_all(&de, kOne);
+    //err = sinkhorn_knopp::Equilibrate(s_hdl, d_hdl, descr, &A, &d, &e, m, n,
+    //                                  i_A);
 
     if (!err) {
       // TODO: Issue warning if x == NULL or y == NULL
@@ -592,6 +593,11 @@ int Pogs(PogsData<T, M> *pogs_data) {
     thrust::transform(g.begin(), g.end(), thrust::device_pointer_cast(e.data),
     g.begin(), ApplyOp<T, thrust::multiplies<T> >(thrust::multiplies<T>()));
   }
+
+  thrust::device_vector<T> over_m(n_sub, 1.0 / m_nodes);
+  thrust::transform(g.begin(), g.end(),
+                  over_m.begin(), g.begin(),
+                  ApplyOp<T, thrust::multiplies<T> >(thrust::multiplies<T>()));
   
 
   // Signal start of execution.
@@ -608,6 +614,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
   double t = timer<double>();
   for (unsigned int k = 0; !err; ++k) {
+    double iter_time = timer<double>();
     double prox_time = 0;
     double global_z_time = 0;
     double global_z12_time = 0;
@@ -710,6 +717,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
 #endif
       cml::blas_scal(d_hdl, 1.0 / m_nodes, &xh);
       avg_time = timer<double>() - avg_time;
+    } else {
+      cml::vector_memcpy(&xh, &x);
     }
 
     cml::blas_axpy(d_hdl, -kOne, &zprev, &z12);
@@ -760,13 +769,18 @@ int Pogs(PogsData<T, M> *pogs_data) {
         delta = std::max(delta / kGamma, kDeltaMin);
       }
     }
-    if (!pogs_data->quiet)
-      Printf("TIME |   prox   | global_z | global_z12 |    proj   | primal \n" \
-             "      %.3e  %.3e  %.3e    %.3e     %.3e\n" \
+    if (kRank == 0) {
+      iter_time = timer<double>() - iter_time;
+      /*Printf("TIME |   prox   | global_z | global_z12 |    proj   | primal \n" \
+             "      %.3f  %.3f  %.3f    %.3f     %.3f\n" \
              "     |   avg    | dual_approx |   dual   \n" \
-             "      %.3e  %.3e     %.3e\n",
-             prox_time, global_z_time, global_z12_time, proj_time, primal_time,
-             avg_time, dual_approx_time, dual_time);
+             "      %.3f  %.3f     %.3f\n",
+             prox_time/iter_time, global_z_time/iter_time,
+             global_z12_time/iter_time, proj_time/iter_time,
+             primal_time/iter_time, avg_time/iter_time,
+             dual_approx_time/iter_time, dual_time/iter_time);*/
+      Printf("ITER %d TIME: %.3e\n", k, iter_time);
+    }
   }
   Printf("TIME = %e\n", timer<double>() - t);
 
