@@ -33,7 +33,7 @@ T Asum(std::vector<T> *v) {
 // for 50 values of \lambda.
 // See <pogs>/matlab/examples/lasso_path.m for detailed description.
 template <typename T>
-double LassoPath(int m, int n, int nnz, int m_nodes) {
+double LassoPath(int m_nodes, int m, int n, int nnz) {
   int kRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
   
@@ -136,6 +136,6 @@ double LassoPath(int m, int n, int nnz, int m_nodes) {
   return timer<double>() - t;
 }
 
-template double LassoPath<double>(int m, int n, int nnz, int m_nodes);
-template double LassoPath<float>(int m, int n, int nnz, int m_nodes);
+template double LassoPath<double>(int m_nodes, int m, int n, int nnz);
+template double LassoPath<float>(int m_nodes, int m, int n, int nnz);
 

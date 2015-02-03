@@ -18,6 +18,18 @@
 #include "timer.hpp"
 #include "mpi_util.h"
 
+#ifdef POGS_TEST
+#undef Printf
+#define Printf
+#endif
+
+char test_sep = ':';
+
+template <typename T>
+inline void TestPrintT(const char *name, T value) {
+  printf("%s %c %.3e\n", name, test_sep, value);
+}
+
 // Apply operator to h.a and h.d.
 template <typename T, typename Op>
 struct ApplyOp: thrust::binary_function<FunctionObj<T>, FunctionObj<T>, T> {
@@ -374,7 +386,6 @@ void SendSubMatrices(PogsData<T, M> *pogs_data, M &A) {
 // Proximal Operator Graph Solver.
 template<typename T, typename M>
 int Pogs(PogsData<T, M> *pogs_data) {
-  double total_time = timer<double>();
   // Constants for adaptive-rho and over-relaxation.
   const T kDeltaMin = static_cast<T>(1.05);
   const T kGamma = static_cast<T>(1.01);
@@ -387,6 +398,21 @@ int Pogs(PogsData<T, M> *pogs_data) {
   const T kRhoMax = static_cast<T>(1e4);
   const T kRhoMin = static_cast<T>(1e-4);
   const CBLAS_ORDER kOrd = M::Ord == ROW ? CblasRowMajor : CblasColMajor;
+
+  double total_time, bcast_meta_time, allocate_aij_time, send_matrix_time,
+    admm_allocate_time, preprocess_time, total_iter_time, total_prox_time,
+    total_global_z_time, total_global_z12_time, total_proj_time,
+    total_primal_time, total_avg_time, total_dual_time;
+
+  total_iter_time = 0;
+  total_prox_time = 0;
+  total_global_z_time = 0;
+  total_global_z12_time = 0;
+  total_proj_time = 0;
+  total_primal_time = 0;
+  total_avg_time = 0;
+  total_dual_time = 0;
+  total_time = timer<double>();
 
   // Setup MPI 
   int kLocalRank = atoi(getenv("OMPI_COMM_WORLD_LOCAL_RANK"));
@@ -402,7 +428,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cudaSetDevice(kLocalRank % kDeviceCount);
 
   // Transfer pogs meta data
-  double bcast_time = timer<double>();
+  bcast_meta_time = timer<double>();
   int nnz = pogs_data->A.nnz;
   MPI_Bcast(&nnz, sizeof(typename M::I_t), MPI_BYTE, 0, MPI_COMM_WORLD);
   MPI_Bcast(&pogs_data->m, 1, MPI_UINT64_T, 0, MPI_COMM_WORLD);
@@ -419,6 +445,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   MPI_Bcast(&pogs_data->gap_stop, sizeof(bool), MPI_BYTE, 0, MPI_COMM_WORLD);
   MPI_Bcast(&pogs_data->init_x, sizeof(bool), MPI_BYTE, 0, MPI_COMM_WORLD);
   MPI_Bcast(&pogs_data->init_y, sizeof(bool), MPI_BYTE, 0, MPI_COMM_WORLD);
+  bcast_meta_time = timer<double>() - bcast_meta_time;
 
   // Extract meta data from pogs_data
   int m = pogs_data->m, n = pogs_data->n;
@@ -433,23 +460,23 @@ int Pogs(PogsData<T, M> *pogs_data) {
     i_A = kRank % m_nodes; // Row, m
     j_A = kRank / m_nodes; // Column, n
   }
-  Printf("Sub matrix position: i, j = %d, %d\n", i_A, j_A);
 
   // Setup sub matrix size
   int m_sub = m / m_nodes;
   int n_sub = n / n_nodes;
-  Printf("Sub matrix size: %d x %d\n", m_sub, n_sub);
 
-  double send_sub_time = timer<double>();
+  allocate_aij_time = timer<double>();
   M A_ij(new T[nnz],
          new typename M::I_t[M::Ord == ROW ? m_sub + 1 : n_sub + 1],
          new typename M::I_t[nnz],
          nnz);
+  allocate_aij_time = timer<double>() - allocate_aij_time;
+
+  send_matrix_time = timer<double>();
   SendSubMatrices(pogs_data, A_ij);
-  printf("Send sub time: %.3e\n", timer<double>() - send_sub_time);
+  send_matrix_time = timer<double>() - send_matrix_time;
 
   int nnz_sub = A_ij.nnz;
-  Printf("Sub matrix nnz: %d\n", nnz_sub);
   
   thrust::device_vector<FunctionObj<T> > f = pogs_data->f;
   thrust::device_vector<FunctionObj<T> > g = pogs_data->g;
@@ -476,7 +503,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cudaStreamCreate(&aij_s);
 
   // Allocate data for ADMM variables.
-  double malloc_time = timer<double>();
+  admm_allocate_time = timer<double>();
   bool pre_process = true;
   cml::vector<T> de, z, zt;
   cml::vector<T> zprev = cml::vector_calloc<T>(m_sub + n_sub);
@@ -509,6 +536,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
       z12.data == 0 || A.val == 0 || A.ind == 0 || A.ptr == 0) {
     err = 1;
   }
+  admm_allocate_time = timer<double>() - admm_allocate_time;
 
   // Create views for x and y components.
   cml::vector<T> d = cml::vector_subvector(&de, 0, m);
@@ -542,6 +570,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cml::vector<T> yfinal = cml::vector_alloc<T>(m);
 #endif
 
+  preprocess_time = timer<double>();
   if (pre_process && !err) {
     cml::spmat_memcpy(s_hdl, &A, A_ij.val, A_ij.ind, A_ij.ptr);
     cml::vector_set_all(&de, kOne);
@@ -581,6 +610,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
       }
     }
   }
+  preprocess_time = timer<double>() - preprocess_time;
 
   // todo(abp): figure out how e and d work with Block splitting
 
@@ -612,8 +642,9 @@ int Pogs(PogsData<T, M> *pogs_data) {
   unsigned int kd = 0, ku = 0;
   bool converged = false;
 
-  double t = timer<double>();
-  for (unsigned int k = 0; !err; ++k) {
+  total_iter_time = timer<double>();
+  unsigned int k;
+  for (k = 0; !err; ++k) {
     double iter_time = timer<double>();
     double prox_time = 0;
     double global_z_time = 0;
@@ -621,7 +652,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
     double proj_time = 0;
     double primal_time = 0;
     double avg_time = 0;
-    double dual_approx_time = 0;
     double dual_time = 0;
 
     cml::vector_memcpy(&zprev, &z);
@@ -632,7 +662,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     ProxEval(g, rho, xh.data, xh.stride, x12.data, x12.stride);
     ProxEval(f, rho, y.data, y.stride, y12.data, y12.stride);
     prox_time = timer<double>() - prox_time;
-
+    total_prox_time += prox_time;
     
     // Compute dual variable.
     T nrm_r = 0, nrm_s = 0, gap, z_nrm, z12_nrm, temp;
@@ -649,6 +679,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     mpiu::Allreduce(&z_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
     z_nrm = sqrtf(cml::blas_dot(d_hdl, &xh, &xh) + temp);
     global_z_time = timer<double>() - global_z_time;
+    total_global_z_time += global_z_time;
 
     global_z12_time = timer<double>();
     // Calculate global z12 norm
@@ -657,6 +688,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     mpiu::Allreduce(&z12_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
     z12_nrm = sqrtf(cml::blas_dot(d_hdl, &x12, &x12) + temp);
     global_z12_time = timer<double>() - global_z12_time;
+    total_global_z12_time += global_z12_time;
     
     T eps_gap = std::sqrt(static_cast<T>(m + n)) * pogs_data->abs_tol +
         pogs_data->rel_tol * z_nrm * z12_nrm;
@@ -680,6 +712,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     nrm_r = sqrtf(nrm_s);
     nrm_s = 0;
     primal_time = timer<double>() - primal_time;
+    total_primal_time += primal_time;
 
     cml::vector_set_all(&x, kZero);
     cml::spblas_solve(s_hdl, d_hdl, descr, &A, kOne, &y, &x, kTol, 5, true);
@@ -687,6 +720,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_NON_TRANSPOSE, descr, kOne, &A,
         &x, kZero, &y);
     proj_time = timer<double>() - proj_time;
+    total_proj_time += proj_time;
 
     // Apply over relaxation.
     cml::blas_scal(d_hdl, kAlpha, &z);
@@ -717,6 +751,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
 #endif
       cml::blas_scal(d_hdl, 1.0 / m_nodes, &xh);
       avg_time = timer<double>() - avg_time;
+      total_avg_time += avg_time;
     } else {
       cml::vector_memcpy(&xh, &x);
     }
@@ -733,6 +768,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     mpiu::Allreduce(&nrm_s, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
     nrm_s = rho * sqrtf(temp);
     dual_time = timer<double>() - dual_time;
+    total_dual_time += dual_time;
 
     // Evaluate stopping criteria.
     converged = nrm_r < eps_pri && nrm_s < eps_dua &&
@@ -782,7 +818,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
       Printf("ITER %d TIME: %.3e\n", k, iter_time);
     }
   }
-  Printf("TIME = %e\n", timer<double>() - t);
+  total_iter_time = timer<double>() - total_iter_time;
+  Printf("TIME = %e\n", total_iter_time);
 
 
   cml::blas_scal(d_hdl, rho, &y);
@@ -859,34 +896,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
     }
   }
 
-  if (kRank == 0) {
-    T nrm = 0;
-    if (pogs_data->x != 0) {
-      for (int i = 0; i < n; ++i) {
-        nrm += pogs_data->x[i] * pogs_data->x[i];
-      }
-      nrm = sqrtf(nrm);
-      Printf("final x nrm: %f\n", nrm);
-    }
-
-    if (pogs_data->y != 0) {
-      nrm = 0;
-      for (int i = 0; i < m; ++i) {
-        nrm += pogs_data->y[i] * pogs_data->y[i];
-      }
-      nrm = sqrtf(nrm);
-      Printf("final y nrm: %f\n", nrm);
-    }
-
-    if (pogs_data->l != 0) {
-      nrm = 0;
-      for (int i = 0; i < m; ++i) {
-        nrm += pogs_data->l[i] * pogs_data->l[i];
-      }
-      nrm = sqrtf(nrm);
-      Printf("final l nrm: %f\n", nrm);
-    }
-  }
 
 #ifdef POGS_OMPI_CUDA
   cml::matrix_free(&gather_buf);
@@ -919,7 +928,73 @@ int Pogs(PogsData<T, M> *pogs_data) {
   delete A_ij.ptr;
   delete A_ij.ind;
 
-  printf("TOTAL TIME: %.3e\n", timer<double>() - total_time);
+#ifdef POGS_TEST
+  TestPrintT("total_time", timer<double>() - total_time);
+  TestPrintT("bcast_meta_time", bcast_meta_time);
+  TestPrintT("total_iter_time", total_iter_time);
+  TestPrintT("send_matrix_time", send_matrix_time);
+  TestPrintT("admm_allocate_time", admm_allocate_time);
+  TestPrintT("preprocess_time", preprocess_time);
+  TestPrintT("total_iter_time", total_iter_time);
+  TestPrintT("total_prox_time", total_prox_time);
+  TestPrintT("total_global_z_time", total_global_z_time);
+  TestPrintT("total_global_z12_time", total_global_z12_time);
+  TestPrintT("total_proj_time", total_proj_time);
+  TestPrintT("total_primal_time", total_primal_time);
+  TestPrintT("total_avg_time", total_avg_time);
+  TestPrintT("total_dual_time", total_dual_time);
+  printf("total_iterations %c %d\n", test_sep, k);
+#endif
+  Printf("TOTAL TIME: %.3e\n", timer<double>() - total_time);
+
+  // Print out norms
+  if (kRank == 0) {
+    T x_nrm, y_nrm, l_nrm;
+
+    x_nrm = -1;
+    if (pogs_data->x != 0) {
+      x_nrm = 0;
+      for (int i = 0; i < n; ++i) {
+        x_nrm += pogs_data->x[i] * pogs_data->x[i];
+      }
+      x_nrm = sqrtf(x_nrm);
+    } 
+
+    y_nrm = -1;
+    if (pogs_data->y != 0) {
+      y_nrm = -1;
+      for (int i = 0; i < m; ++i) {
+        y_nrm += pogs_data->y[i] * pogs_data->y[i];
+      }
+      y_nrm = sqrtf(y_nrm);
+    }
+
+    l_nrm = -1;
+    if (pogs_data->l != 0) {
+      l_nrm = 0;
+      for (int i = 0; i < m; ++i) {
+        l_nrm += pogs_data->l[i] * pogs_data->l[i];
+      }
+      l_nrm = sqrtf(l_nrm);
+    }
+
+#ifdef POGS_TEST
+    if (x_nrm != -1)
+      TestPrintT("x_nrm", x_nrm);
+    if (y_nrm != -1)
+      TestPrintT("y_nrm", y_nrm);
+    if (l_nrm != -1)
+      TestPrintT("l_nrm", l_nrm);
+#else
+    Printf("Final norms |\n");
+    if (x_nrm != -1)
+      Printf("         x  | %.3e\n", x_nrm);
+    if (y_nrm != -1)
+      Printf("         y  | %.3e\n", y_nrm);
+    if (l_nrm != -1)
+      Printf("         l  | %.3e\n", l_nrm);
+#endif
+  }
 
   return err;
 }
@@ -928,7 +1003,7 @@ template <typename T, typename I, POGS_ORD O>
 int AllocSparseFactors(PogsData<T, Sparse<T, I, O> > *pogs_data) {
   size_t m = pogs_data->m, n = pogs_data->n, nnz = pogs_data->A.nnz;
   size_t flen = 1 + 3 * (n + m) + nnz;
-  printf("flen = %lu\n", flen);
+  Printf("flen = %lu\n", flen);
 
   Sparse<T, I, O>& A = pogs_data->factors;
   A.val = 0;

@@ -38,7 +38,14 @@ gpu: run_all.cpp examples.h $(EXSRC)
  $(POGSROOT)/pogs_sp_m_cu.o $(POGSROOT)/pogs_cu_link.o \
 $(POGSROOT)/pogs_cu.o $(POGSROOT)/cml.o $(CULDFLAGS) $(MPI_LFLAGS)
 
+test: CXXFLAGS+=-DPOGS_TEST
+test: run_test.cpp examples.h $(EXSRC)
+	$(MAKE) -C $(POGSROOT) test pogs_sp_m_cu.o pogs_cu.o pogs_cu_link.o cml.o
+	$(CXX) $(CXXFLAGS) $(CUXXFLAGS) $(MPI_CFLAGS) -o run_test $(EXSRC) $< \
+ $(POGSROOT)/pogs_sp_m_cu.o $(POGSROOT)/pogs_cu_link.o \
+$(POGSROOT)/pogs_cu.o $(POGSROOT)/cml.o $(CULDFLAGS) $(MPI_LFLAGS)
+
 clean:
-	rm -f *.o *~ *~ run
+	rm -f *.o *~ *~ run run_test
 	rm -rf *.dSYM
 

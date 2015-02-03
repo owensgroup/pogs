@@ -26,6 +26,9 @@ endif
 
 all: pogs.o pogs_cu_link.o pogs_cu.o pogs_sp_m_cu.o cml.o
 
+test: CUFLAGS+=-DPOGS_TEST
+test: pogs_cu_link.o pogs_cu.o pogs_sp_m_cu.o cml.o
+
 # CPU
 pogs.o: pogs.cpp pogs.h prox_lib.h _interface_defs.h sinkhorn_knopp.h
 	$(CXX) $(CXXFLAGS) $(IFLAGS) $< -c -o $@

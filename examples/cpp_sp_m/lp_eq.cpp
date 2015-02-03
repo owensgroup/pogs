@@ -14,7 +14,7 @@
 //
 // See <pogs>/matlab/examples/lp_eq.m for detailed description.
 template <typename T>
-double LpEq(int m, int n, int nnz, int m_nodes) {
+double LpEq(int m_nodes, int m, int n, int nnz) {
   int kRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
 
@@ -85,6 +85,6 @@ double LpEq(int m, int n, int nnz, int m_nodes) {
   return timer<double>() - t;
 }
 
-template double LpEq<double>(int m, int n, int nnz, int m_nodes);
-template double LpEq<float>(int m, int n, int nnz, int m_nodes);
+template double LpEq<double>(int m_nodes, int m, int n, int nnz);
+template double LpEq<float>(int m_nodes, int m, int n, int nnz);
 

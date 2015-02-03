@@ -12,7 +12,7 @@
 //
 // See <pogs>/matlab/examples/lasso.m for detailed description.
 template <typename T>
-double Lasso(int m, int n, int nnz, int m_nodes) {
+double Lasso(int m_nodes, int m, int n, int nnz) {
   int kRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
 
@@ -68,6 +68,6 @@ double Lasso(int m, int n, int nnz, int m_nodes) {
   return timer<double>() - t;
 }
 
-template double Lasso<double>(int m, int n, int nnz, int m_nodes);
-template double Lasso<float>(int m, int n, int nnz, int m_nodes);
+template double Lasso<double>(int m_nodes, int m, int n, int nnz);
+template double Lasso<float>(int m_nodes, int m, int n, int nnz);
 

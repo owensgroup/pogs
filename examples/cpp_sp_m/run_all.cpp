@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   MASTER(kRank) {
     printf("\nLasso.\n");
   }
-  t = Lasso<real_t>(1000, 10000, 100000, m_nodes);
+  t = Lasso<real_t>(m_nodes, 1000, 10000, 100000);
 //  t = Lasso<real_t>(10000, 10000000, 200000000);
   MASTER(kRank) {
     printf("Solver Time: %e sec\n", t);
@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
     printf("\nLinear Program in Equality Form.\n");
   }
   //t = LpEq<real_t>(100000, 10000000, 200000000, m_nodes);
-    t = LpEq<real_t>(2000, 1000, 100000, m_nodes);
+  t = LpEq<real_t>(m_nodes, 2000, 1000, 100000);
   MASTER(kRank) {
     printf("Solver Time: %e sec\n", t);
   }
