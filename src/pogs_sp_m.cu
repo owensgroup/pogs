@@ -20,7 +20,7 @@
 
 #ifdef POGS_TEST
 #undef Printf
-#define Printf
+#define Printf NULL
 #endif
 
 char test_sep = ':';
