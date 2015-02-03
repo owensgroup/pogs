@@ -18,11 +18,6 @@
 #include "timer.hpp"
 #include "mpi_util.h"
 
-#ifdef POGS_TEST
-#undef Printf
-#define Printf NULL
-#endif
-
 char test_sep = ':';
 
 template <typename T>
@@ -414,6 +409,10 @@ int Pogs(PogsData<T, M> *pogs_data) {
   total_dual_time = 0;
   total_time = timer<double>();
 
+#ifdef POGS_TEST
+  pogs_data->quiet = true;
+#endif
+
   // Setup MPI 
   int kLocalRank = atoi(getenv("OMPI_COMM_WORLD_LOCAL_RANK"));
   int kRank, kNodes;
@@ -787,7 +786,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
           cml::blas_scal(d_hdl, 1 / delta, &xh);
           delta = kGamma * delta;
           ku = k;
-          Printf("+ rho %e\n", rho);
+          if (!pogs_data->quiet)
+            Printf("+ rho %e\n", rho);
         }
       } else if (nrm_s > xi * eps_dua && nrm_r < xi * eps_pri &&
           kTau * static_cast<T>(k) > static_cast<T>(ku)) {
@@ -797,7 +797,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
           cml::blas_scal(d_hdl, delta, &xh);
           delta = kGamma * delta;
           kd = k;
-          Printf("- rho %e\n", rho);
+          if (!pogs_data->quiet)
+            Printf("- rho %e\n", rho);
         }
       } else if (nrm_s < xi * eps_dua && nrm_r < xi * eps_pri) {
         xi *= kKappa;
@@ -805,7 +806,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
         delta = std::max(delta / kGamma, kDeltaMin);
       }
     }
-    if (kRank == 0) {
+    if (kRank == 0 && !pogs_data->quiet) {
       iter_time = timer<double>() - iter_time;
       /*Printf("TIME |   prox   | global_z | global_z12 |    proj   | primal \n" \
              "      %.3f  %.3f  %.3f    %.3f     %.3f\n" \
@@ -819,7 +820,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
     }
   }
   total_iter_time = timer<double>() - total_iter_time;
-  Printf("TIME = %e\n", total_iter_time);
+  if (!pogs_data->quiet)
+    Printf("TIME = %e\n", total_iter_time);
 
 
   cml::blas_scal(d_hdl, rho, &y);
@@ -946,7 +948,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
     TestPrintT("total_dual_time", total_dual_time);
     printf("total_iterations %c %d\n", test_sep, k);
 #endif
-    Printf("TOTAL TIME: %.3e\n", timer<double>() - total_time);
+    if (!pogs_data->quiet)
+      Printf("TOTAL TIME: %.3e\n", timer<double>() - total_time);
 
     // Print out norms
     T x_nrm, y_nrm, l_nrm;
@@ -986,13 +989,15 @@ int Pogs(PogsData<T, M> *pogs_data) {
     if (l_nrm != -1)
       TestPrintT("l_nrm", l_nrm);
 #else
-    Printf("Final norms |\n");
-    if (x_nrm != -1)
-      Printf("         x  | %.3e\n", x_nrm);
-    if (y_nrm != -1)
-      Printf("         y  | %.3e\n", y_nrm);
-    if (l_nrm != -1)
-      Printf("         l  | %.3e\n", l_nrm);
+    if (!pogs_data->quiet) {
+      Printf("Final norms |\n");
+      if (x_nrm != -1)
+        Printf("         x  | %.3e\n", x_nrm);
+      if (y_nrm != -1)
+        Printf("         y  | %.3e\n", y_nrm);
+      if (l_nrm != -1)
+        Printf("         l  | %.3e\n", l_nrm);
+    }
 #endif
   }
 
@@ -1003,7 +1008,8 @@ template <typename T, typename I, POGS_ORD O>
 int AllocSparseFactors(PogsData<T, Sparse<T, I, O> > *pogs_data) {
   size_t m = pogs_data->m, n = pogs_data->n, nnz = pogs_data->A.nnz;
   size_t flen = 1 + 3 * (n + m) + nnz;
-  Printf("flen = %lu\n", flen);
+  if (!pogs_data->quiet)
+    Printf("flen = %lu\n", flen);
 
   Sparse<T, I, O>& A = pogs_data->factors;
   A.val = 0;
