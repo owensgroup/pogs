@@ -928,27 +928,27 @@ int Pogs(PogsData<T, M> *pogs_data) {
   delete A_ij.ptr;
   delete A_ij.ind;
 
-#ifdef POGS_TEST
-  TestPrintT("total_time", timer<double>() - total_time);
-  TestPrintT("bcast_meta_time", bcast_meta_time);
-  TestPrintT("total_iter_time", total_iter_time);
-  TestPrintT("send_matrix_time", send_matrix_time);
-  TestPrintT("admm_allocate_time", admm_allocate_time);
-  TestPrintT("preprocess_time", preprocess_time);
-  TestPrintT("total_iter_time", total_iter_time);
-  TestPrintT("total_prox_time", total_prox_time);
-  TestPrintT("total_global_z_time", total_global_z_time);
-  TestPrintT("total_global_z12_time", total_global_z12_time);
-  TestPrintT("total_proj_time", total_proj_time);
-  TestPrintT("total_primal_time", total_primal_time);
-  TestPrintT("total_avg_time", total_avg_time);
-  TestPrintT("total_dual_time", total_dual_time);
-  printf("total_iterations %c %d\n", test_sep, k);
-#endif
-  Printf("TOTAL TIME: %.3e\n", timer<double>() - total_time);
-
-  // Print out norms
   if (kRank == 0) {
+#ifdef POGS_TEST
+    TestPrintT("total_time", timer<double>() - total_time);
+    TestPrintT("bcast_meta_time", bcast_meta_time);
+    TestPrintT("total_iter_time", total_iter_time);
+    TestPrintT("send_matrix_time", send_matrix_time);
+    TestPrintT("admm_allocate_time", admm_allocate_time);
+    TestPrintT("preprocess_time", preprocess_time);
+    TestPrintT("total_iter_time", total_iter_time);
+    TestPrintT("total_prox_time", total_prox_time);
+    TestPrintT("total_global_z_time", total_global_z_time);
+    TestPrintT("total_global_z12_time", total_global_z12_time);
+    TestPrintT("total_proj_time", total_proj_time);
+    TestPrintT("total_primal_time", total_primal_time);
+    TestPrintT("total_avg_time", total_avg_time);
+    TestPrintT("total_dual_time", total_dual_time);
+    printf("total_iterations %c %d\n", test_sep, k);
+#endif
+    Printf("TOTAL TIME: %.3e\n", timer<double>() - total_time);
+
+    // Print out norms
     T x_nrm, y_nrm, l_nrm;
 
     x_nrm = -1;
