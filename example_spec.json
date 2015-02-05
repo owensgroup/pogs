@@ -1,0 +1,86 @@
+{
+    "solvers": [
+        {
+            "name": "pogs",
+            "directory": "~/repos/pogs-vanilla/examples/cpp_sp/",
+            "run": "./test_run",
+            "tests": ["lasso_mn", "lp_mn"]
+        },
+        {
+            "name": "pogs_row_2",
+            "directory": "~/repos/pogs/examples/cpp_sp_m/",
+            "run": "mpirun -q -np 2 ./test_run 2",
+            "tests": ["lasso_mn", "lp_mn"]
+        },
+        {
+            "name": "pogs_row_4",
+            "directory": "~/repos/pogs/examples/cpp_sp_m/",
+            "run": "mpirun -q -np 4 ./test_run 4",
+            "tests": ["lasso_mn", "lp_mn"]
+        },
+        {
+            "name": "pogs_row_8",
+            "directory": "~/repos/pogs/examples/cpp_sp_m/",
+            "run": "mpirun -q -np 8 ./test_run 8",
+            "tests": ["lasso_mn", "lp_mn"]
+        },
+        {
+            "name": "pogs_row_16",
+            "directory": "~/repos/pogs/examples/cpp_sp_m/",
+            "run": "mpirun -q -np 16 ./test_run 16",
+            "tests": ["lasso_mn", "lp_mn"]
+        }
+    ],
+    
+    "tests": {
+        "lasso_mn": {
+            "type": "lasso",
+            "params": [
+                {
+                    "M": "1024",
+                    "N": "16384",
+                    "density": "0.05"
+                },
+                {
+                    "M": "2048",
+                    "N": "32768",
+                    "density": "0.05"
+                },
+                {
+                    "M": "4096",
+                    "N": "655386",
+                    "density": "0.05"
+                },
+                {
+                    "M": "8192",
+                    "N": "131072",
+                    "density": "0.05"
+                },
+                {
+                    "M": "16384",
+                    "N": "262144",
+                    "density": "0.05"
+                },
+                {
+                    "M": "32768",
+                    "N": "524288",
+                    "density": "0.05"
+                }
+                
+            ]
+        },
+        "lp_mn": {
+            "type": "lp",
+            "params": [
+                {
+                    "M": "2048",
+                    "N": "1024",
+                    "density": "0.05"
+                }
+            ]
+        }
+    }
+}
+
+
+
