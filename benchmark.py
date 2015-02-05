@@ -51,7 +51,8 @@ def process_test_spec(spec):
 
 def make_tests(solvers):
     for solver in solvers:
-        subprocess.Popen('make', 'test', cwd=solver['directory'])
+        p = subprocess.Popen('make', 'test', cwd=solver['directory'])
+        p.wait()
 
 
 def parse_solver_output(output, error):
@@ -65,16 +66,20 @@ def parse_solver_output(output, error):
 
 
 def run_plan(plan, test_settings):
+    print('Starting test plan')
     results = defaultdict(defaultdict(list))
     for test_name, tests in plan.iteritems():
         settings = test_settings[test_name]
         typ = settings['type']
+        print('')
         for param in settings['params']:
             M = param['M']
             N = param['N']
             nnz = int(M) * int(N) * int(param['density'])
             args = test_args_template.format(typ=typ, M=M, N=N, nnz=nnz)
+            print('Starting tests for args: ' + args)
             for task in tests:
+                print('Running task with run cmd: ' + task['run'])
                 p = subprocess.Popen(
                     task['run'],
                     args,
@@ -83,8 +88,11 @@ def run_plan(plan, test_settings):
                     stderr=subprocess.PIPE
                 )
                 sout, serr = p.communicate()
+                print('Finished task')
                 result = parse_solver_output(sout, serr)
                 results[test_name][task['name']].append(result)
+            print('Finished tests')
+    print('Finished test plan')
     return results
 
 
@@ -103,10 +111,13 @@ def main(argv):
         spec_file = 'spec.json'
 
     spec_fo = open(spec_file, 'r')
+    print('Parsing test spec')
     spec = parse_test_spec(spec_fo)
     spec_fo.close()
 
+    print('Processing test spec')
     plan = process_test_spec(spec)
+    print('Building test code')
     make_tests(spec['solvers'])
     test_results = run_plan(plan)
     pprint(test_results)
