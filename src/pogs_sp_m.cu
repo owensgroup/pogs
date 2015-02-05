@@ -947,9 +947,10 @@ int Pogs(PogsData<T, M> *pogs_data) {
     TestPrintT("total_avg_time", total_avg_time);
     TestPrintT("total_dual_time", total_dual_time);
     printf("total_iterations %c %d\n", test_sep, k);
-#endif
+#else
     if (!pogs_data->quiet)
       Printf("TOTAL TIME: %.3e\n", timer<double>() - total_time);
+#endif
 
     // Print out norms
     T x_nrm, y_nrm, l_nrm;
