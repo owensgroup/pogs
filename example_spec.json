@@ -3,31 +3,31 @@
         {
             "name": "pogs",
             "directory": "~/repos/pogs-vanilla/examples/cpp_sp/",
-            "run": "./test_run",
+            "run": "./run_test",
             "tests": ["lasso_mn", "lp_mn"]
         },
         {
             "name": "pogs_row_2",
             "directory": "~/repos/pogs/examples/cpp_sp_m/",
-            "run": "mpirun -q -np 2 ./test_run 2",
+            "run": "mpirun -q -np 2 ./run_test 2",
             "tests": ["lasso_mn", "lp_mn"]
         },
         {
             "name": "pogs_row_4",
             "directory": "~/repos/pogs/examples/cpp_sp_m/",
-            "run": "mpirun -q -np 4 ./test_run 4",
+            "run": "mpirun -q -np 4 ./run_test 4",
             "tests": ["lasso_mn", "lp_mn"]
         },
         {
             "name": "pogs_row_8",
             "directory": "~/repos/pogs/examples/cpp_sp_m/",
-            "run": "mpirun -q -np 8 ./test_run 8",
+            "run": "mpirun -q -np 8 ./run_test 8",
             "tests": ["lasso_mn", "lp_mn"]
         },
         {
             "name": "pogs_row_16",
             "directory": "~/repos/pogs/examples/cpp_sp_m/",
-            "run": "mpirun -q -np 16 ./test_run 16",
+            "run": "mpirun -q -np 16 ./run_test 16",
             "tests": ["lasso_mn", "lp_mn"]
         }
     ],
