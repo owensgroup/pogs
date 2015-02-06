@@ -51,7 +51,7 @@ def process_test_spec(spec):
 
 def make_tests(solvers):
     for solver in solvers:
-        p = subprocess.Popen('make', 'test', cwd=solver['directory'])
+        p = subprocess.Popen(['make', 'test'], cwd=solver['directory'])
         p.wait()
 
 
@@ -67,7 +67,7 @@ def parse_solver_output(output, error):
 
 def run_plan(plan, test_settings):
     print('Starting test plan')
-    results = defaultdict(defaultdict(list))
+    results = defaultdict(lambda: defaultdict(list))
     for test_name, tests in plan.iteritems():
         settings = test_settings[test_name]
         typ = settings['type']
@@ -75,14 +75,13 @@ def run_plan(plan, test_settings):
         for param in settings['params']:
             M = param['M']
             N = param['N']
-            nnz = int(M) * int(N) * int(param['density'])
+            nnz = int(M) * int(N) * float(param['density'])
             args = test_args_template.format(typ=typ, M=M, N=N, nnz=nnz)
             print('Starting tests for args: ' + args)
             for task in tests:
                 print('Running task with run cmd: ' + task['run'])
                 p = subprocess.Popen(
-                    task['run'],
-                    args,
+                    [task['run'], args],
                     cwd=task['directory'],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE
@@ -119,7 +118,7 @@ def main(argv):
     plan = process_test_spec(spec)
     print('Building test code')
     make_tests(spec['solvers'])
-    test_results = run_plan(plan)
+    test_results = run_plan(plan, spec['tests'])
     pprint(test_results)
     save_test_results()
     display_test_results(test_results)
