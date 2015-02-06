@@ -46,6 +46,7 @@ test: run_test.cpp examples.h $(EXSRC)
 $(POGSROOT)/pogs_cu.o $(POGSROOT)/cml.o $(CULDFLAGS) $(MPI_LFLAGS)
 
 clean:
+	rm -f $(POGSROOT)/*.o 
 	rm -f *.o *~ *~ run run_test
 	rm -rf *.dSYM
 
