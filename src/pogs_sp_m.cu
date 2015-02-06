@@ -820,8 +820,9 @@ int Pogs(PogsData<T, M> *pogs_data) {
     }
   }
   total_iter_time = timer<double>() - total_iter_time;
-  if (!pogs_data->quiet)
+  if (!pogs_data->quiet) {
     Printf("TIME = %e\n", total_iter_time);
+  }
 
 
   cml::blas_scal(d_hdl, rho, &y);
@@ -837,10 +838,13 @@ int Pogs(PogsData<T, M> *pogs_data) {
   //               it is only gpu->gpu or host->host.
 
   // Scale x, y and l for output.
+
+  MPI_Bcast(&pogs_data->y, sizeof(pogs_data->y), MPI_BYTE, 0, MPI_COMM_WORLD);
   if (pogs_data->y != 0 && !err) {
     if (m_sub == m) {
       cml::vector_div(&y12, &d);
-      cml::vector_memcpy(pogs_data->y, &y12);
+      if (kRank == 0)
+        cml::vector_memcpy(pogs_data->y, &y12);
     } else {
 #ifndef POGS_OMPI_CUDA
       // NOT FUNCTIONAL RIGHT NOW
@@ -852,16 +856,20 @@ int Pogs(PogsData<T, M> *pogs_data) {
       cudaDeviceSynchronize();
       mpiu::Gather(y12.data, y12.size, y12final.data, y12.size, 0,
                       MPI_COMM_WORLD);
-      cml::vector_div(&y12final, &d);
-      cml::vector_memcpy(pogs_data->y, &y12final);
+      if (kRank == 0) {
+        cml::vector_div(&y12final, &d);
+        cml::vector_memcpy(pogs_data->y, &y12final);
+      }
 #endif
     }
   }
 
+  MPI_Bcast(&pogs_data->x, sizeof(pogs_data->x), MPI_BYTE, 0, MPI_COMM_WORLD);
   if (pogs_data->x != 0 && !err) {
     if (n_sub == n) {
       cml::vector_mul(&x12, &e);
-      cml::vector_memcpy(pogs_data->x, &x12);
+      if (kRank == 0)
+        cml::vector_memcpy(pogs_data->x, &x12);
     } else {
 #ifndef POGS_OMPI_CUDA
       // NOT FUNCTIONAL RIGHT NOW BECAUSE NO SCALING
@@ -873,16 +881,20 @@ int Pogs(PogsData<T, M> *pogs_data) {
       cudaDeviceSynchronize();
       mpiu::Gather(x12.data, x12.size, x12final.data, x12.size, 0,
                    MPI_COMM_WORLD);
-      cml::vector_mul(&x12final, &e);
-      cml::vector_memcpy(pogs_data->x, &x12final);
+      if (kRank == 0) {
+        cml::vector_mul(&x12final, &e);
+        cml::vector_memcpy(pogs_data->x, &x12final);
+      }
 #endif
     }
   }
 
+  MPI_Bcast(&pogs_data->l, sizeof(pogs_data->l), MPI_BYTE, 0, MPI_COMM_WORLD);
   if (pogs_data->l != 0 && !err) {
     if (m_sub == m) {
       cml::vector_mul(&y, &d);
-      cml::vector_memcpy(pogs_data->l, &y);
+      if (kRank == 0)
+        cml::vector_memcpy(pogs_data->l, &y);
     } else {
 #ifndef POGS_OMPI_CUDA
       //NOT FUNCTIONAL BECAUSE NO SCALING
@@ -892,8 +904,10 @@ int Pogs(PogsData<T, M> *pogs_data) {
 #else
       cudaDeviceSynchronize();
       mpiu::Gather(y.data, y.size, yfinal.data, y.size, 0, MPI_COMM_WORLD);
-      cml::vector_mul(&yfinal, &d);
-      cml::vector_memcpy(pogs_data->l, &yfinal);
+      if (kRank == 0) {
+        cml::vector_mul(&yfinal, &d);
+        cml::vector_memcpy(pogs_data->l, &yfinal);
+      }
 #endif
     }
   }
