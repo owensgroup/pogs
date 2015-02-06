@@ -1,6 +1,7 @@
 import sys
 import json
 import subprocess
+import os
 from collections import defaultdict
 from pprint import pprint
 
@@ -31,8 +32,8 @@ def parse_test_spec(file):
     spec = json.load(file)
     if not isinstance(spec, dict):
         return 'Spec root must be an object'
-    for test in spec:
-        pass
+    for solver in spec['solvers']:
+        solver['directory'] = os.path.expanduser(solver['directory'])
     return spec
 
 
@@ -59,8 +60,8 @@ def parse_solver_output(output, error):
     if error is not None:
         pass
     result = dict()
-    for line in output:
-        kv = [x.trim() for x in line.split(':')]
+    for line in output.splitlines():
+        kv = [x.strip() for x in line.split(':')]
         result[kv[0]] = kv[1]
     return result
 
@@ -75,16 +76,18 @@ def run_plan(plan, test_settings):
         for param in settings['params']:
             M = param['M']
             N = param['N']
-            nnz = int(M) * int(N) * float(param['density'])
+            nnz = int(int(M) * int(N) * float(param['density']))
             args = test_args_template.format(typ=typ, M=M, N=N, nnz=nnz)
             print('Starting tests for args: ' + args)
             for task in tests:
-                print('Running task with run cmd: ' + task['run'])
+                cmd = task['run'] + ' ' + args
+                print('Running task with run cmd: ' + cmd)
                 p = subprocess.Popen(
-                    [task['run'], args],
+                    cmd,
                     cwd=task['directory'],
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
+                    stderr=subprocess.PIPE,
+                    shell=True
                 )
                 sout, serr = p.communicate()
                 print('Finished task')
@@ -120,7 +123,7 @@ def main(argv):
     make_tests(spec['solvers'])
     test_results = run_plan(plan, spec['tests'])
     pprint(test_results)
-    save_test_results()
+    save_test_results(test_results)
     display_test_results(test_results)
 
 
