@@ -73,7 +73,7 @@ int MatGenApprox(int m, int n, int nnz, T *val, int *rptr, int *cind, T lb,
 
   for (size_t j = get<0>(values[nnz-1]) + 1; j <= m; ++j)
     rptr[j] = index;
-  printf("ci %d\n", index);
+  printf("actual_nnz :  %d\n", index);
   return index;
 }
 

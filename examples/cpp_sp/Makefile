@@ -5,7 +5,7 @@ POGSROOT=../../src
 EXSRC=lasso.cpp lp_eq.cpp lasso_path.cpp # logistic.cpp lp_ineq.cpp nonneg_l2.cpp svm.cpp
 
 # C++ Flags
-CXX=g++
+CXX=g++-4.8
 CXXFLAGS=-g -O3 -I$(POGSROOT) -fopenmp -std=c++11 -Wall -Wconversion  
 
 # CUDA Flags
@@ -15,10 +15,10 @@ CUXXFLAGS=-D__CUDA
 # Check System Args.
 UNAME = $(shell uname -s)
 ifeq ($(UNAME), Darwin)
-CULDFLAGS=-L/usr/local/cuda/lib -L/usr/local/lib $(CULDFLAGS_)
+CULDFLAGS=-L/usr/local/cuda-6.5/lib -L/usr/local/lib $(CULDFLAGS_)
 else
 LDFLAGS=-lm
-CULDFLAGS=-L/usr/local/cuda/lib64 $(CULDFLAGS_)
+CULDFLAGS=-L/usr/local/cuda-6.5/lib64 $(CULDFLAGS_)
 endif
 
 # CPU

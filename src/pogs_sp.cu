@@ -13,7 +13,24 @@
 #include "cml/cml_spmat.cuh"
 #include "cml/cml_vector.cuh"
 #include "pogs.h"
-//#include "timer.hpp"
+#include "timer.hpp"
+
+char test_sep = ':';
+
+template <typename T>
+inline void TestPrintT(const char *name, T value) {
+  printf("%s %c %.3e\n", name, test_sep, value);
+}
+
+template <typename T>
+inline void TestIterPrintT(unsigned int iter, const char *name, T value) {
+  printf("iter, %d, %s %c %.3e\n", iter, name, test_sep, value);
+}
+
+template <typename T>
+inline void TestIterPrintF(unsigned int iter, const char *name, T value) {
+  printf("iter, %d, %s %c %.3f\n", iter, name, test_sep, value);
+}
 
 // Apply operator to h.a and h.d.
 template <typename T, typename Op>
@@ -42,6 +59,23 @@ int Pogs(PogsData<T, M> *pogs_data) {
   const T kRhoMin = static_cast<T>(1e-4);
   const CBLAS_ORDER kOrd = M::Ord == ROW ? CblasRowMajor : CblasColMajor;
 
+  double total_time, bcast_meta_time, allocate_aij_time, send_matrix_time,
+    admm_allocate_time, preprocess_time, total_iter_time, total_prox_time,
+    total_global_z_time, total_global_z12_time, total_proj_time,
+    total_primal_time, total_avg_time, total_dual_time;
+
+  total_iter_time = 0;
+  total_prox_time = 0;
+  total_global_z_time = 0;
+  total_global_z12_time = 0;
+  total_proj_time = 0;
+  total_primal_time = 0;
+  total_avg_time = 0;
+  total_dual_time = 0;
+  total_time = timer<double>();
+
+  pogs_data->quiet = true;
+
   int err = 0;
 
   // Extract values from pogs_data
@@ -59,6 +93,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cusparseCreateMatDescr(&descr);
 
   // Allocate data for ADMM variables.
+  admm_allocate_time = timer<double>();
   bool pre_process = true;
   cml::vector<T> de, z, zt;
   cml::vector<T> zprev = cml::vector_calloc<T>(m + n);
@@ -88,6 +123,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
       z12.data == 0 || A.val == 0 || A.ind == 0 || A.ptr == 0) {
     err = 1;
   }
+  admm_allocate_time = timer<double>() - admm_allocate_time;
 
   // Create views for x and y components.
   cml::vector<T> d = cml::vector_subvector(&de, 0, m);
@@ -97,6 +133,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cml::vector<T> x12 = cml::vector_subvector(&z12, 0, n);
   cml::vector<T> y12 = cml::vector_subvector(&z12, n, m);
 
+  preprocess_time = timer<double>();
   if (pre_process && !err) {
     cml::spmat_memcpy(s_hdl, &A, pogs_data->A.val, pogs_data->A.ind,
         pogs_data->A.ptr);
@@ -135,6 +172,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
       }
     }
   }
+  preprocess_time = timer<double>() - preprocess_time;
 
   // Scale f and g to account for diagonal scaling e and d.
   if (!err) {
@@ -157,13 +195,26 @@ int Pogs(PogsData<T, M> *pogs_data) {
   bool converged = false;
 
   //double t = timer<double>();
-  for (unsigned int k = 0; !err; ++k) {
+  total_iter_time = timer<double>();
+  unsigned int k;
+  for (k = 0; !err; ++k) {
+    double iter_time = timer<double>();
+    double prox_time = 0;
+    double global_z_time = 0;
+    double global_z12_time = 0;
+    double proj_time = 0;
+    double primal_time = 0;
+    double avg_time = 0;
+    double dual_time = 0;
     cml::vector_memcpy(&zprev, &z);
 
     // Evaluate Proximal Operators
+    prox_time = timer<double>();
     cml::blas_axpy(d_hdl, -kOne, &zt, &z);
     ProxEval(g, rho, x.data, x.stride, x12.data, x12.stride);
     ProxEval(f, rho, y.data, y.stride, y12.data, y12.stride);
+    prox_time = timer<double>() - prox_time;
+    total_prox_time += prox_time;
 
     // Compute dual variable.
     T nrm_r = 0, nrm_s = 0, gap;
@@ -182,15 +233,21 @@ int Pogs(PogsData<T, M> *pogs_data) {
       break;
 
     // Project and Update Dual Variables
+    proj_time = timer<double>();
     cml::vector_memcpy(&y, &y12);
     cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_NON_TRANSPOSE, descr, -kOne, &A,
         &x12, kOne, &y);
+    primal_time = timer<double>();
     nrm_r = cml::blas_nrm2(d_hdl, &y);
+    primal_time = timer<double>() - primal_time;
+    total_primal_time += primal_time;
     cml::vector_set_all(&x, kZero);
     cml::spblas_solve(s_hdl, d_hdl, descr, &A, kOne, &y, &x, kTol, 5, true);
     cml::blas_axpy(d_hdl, kOne, &x12, &x);
     cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_NON_TRANSPOSE, descr, kOne, &A,
         &x, kZero, &y);
+    proj_time = timer<double>() - proj_time;
+    total_proj_time += proj_time;
 
     // Apply over relaxation.
     cml::blas_scal(d_hdl, kAlpha, &z);
@@ -201,6 +258,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::blas_axpy(d_hdl, kOne - kAlpha, &zprev, &zt);
     cml::blas_axpy(d_hdl, -kOne, &z, &zt);
 
+    dual_time = timer<double>();
     bool exact = false;
     cml::blas_axpy(d_hdl, -kOne, &zprev, &z12);
     cml::blas_axpy(d_hdl, -kOne, &z, &zprev);
@@ -211,6 +269,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
       nrm_s = rho * cml::blas_nrm2(d_hdl, &x12);
       exact = true;
     }
+    dual_time = timer<double>() - dual_time;
+    total_dual_time += dual_time;
 
     // Evaluate stopping criteria.
     converged = exact && nrm_r < eps_pri && nrm_s < eps_dua &&
@@ -218,6 +278,11 @@ int Pogs(PogsData<T, M> *pogs_data) {
     if (!pogs_data->quiet && (k % 10 == 0 || converged))
       Printf("%4d :  %.3e  %.3e  %.3e  %.3e  %.3e  %.3e  %.3e\n",
           k, nrm_r, eps_pri, nrm_s, eps_dua, gap, eps_gap, pogs_data->optval);
+
+    TestIterPrintF(k, "nrm_r", nrm_r);
+    TestIterPrintF(k, "eps_pri", eps_pri);
+    TestIterPrintF(k, "nrm_s", nrm_s);
+    TestIterPrintF(k, "eps_dua", eps_dua);
 
     // Rescale rho.
     if (pogs_data->adaptive_rho && !converged) {
@@ -228,7 +293,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
           cml::blas_scal(d_hdl, 1 / delta, &zt);
           delta = kGamma * delta;
           ku = k;
-          Printf("+ rho %e\n", rho);
+          if (!pogs_data->quiet)
+            Printf("+ rho %e\n", rho);
         }
       } else if (nrm_s > xi * eps_dua && nrm_r < xi * eps_pri &&
           kTau * static_cast<T>(k) > static_cast<T>(ku)) {
@@ -237,7 +303,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
           cml::blas_scal(d_hdl, delta, &zt);
           delta = kGamma * delta;
           kd = k;
-          Printf("- rho %e\n", rho);
+          if (!pogs_data->quiet)
+            Printf("- rho %e\n", rho);
         }
       } else if (nrm_s < xi * eps_dua && nrm_r < xi * eps_pri) {
         xi *= kKappa;
@@ -246,6 +313,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
       }
     }
   }
+  total_iter_time = timer<double>() - total_iter_time;
   //Printf("TIME = %e\n", timer<double>() - t);
 
   // Scale x, y and l for output.
@@ -274,6 +342,35 @@ int Pogs(PogsData<T, M> *pogs_data) {
   }
   cml::vector_free(&z12);
   cml::vector_free(&zprev);
+  
+  TestPrintT("total_time", timer<double>() - total_time);
+  TestPrintT("bcast_meta_time", bcast_meta_time);
+  TestPrintT("total_iter_time", total_iter_time);
+  TestPrintT("send_matrix_time", send_matrix_time);
+  TestPrintT("admm_allocate_time", admm_allocate_time);
+  TestPrintT("preprocess_time", preprocess_time);
+  TestPrintT("total_iter_time", total_iter_time);
+  TestPrintT("total_prox_time", total_prox_time);
+  TestPrintT("total_global_z_time", total_global_z_time);
+  TestPrintT("total_global_z12_time", total_global_z12_time);
+  TestPrintT("total_proj_time", total_proj_time);
+  TestPrintT("total_primal_time", total_primal_time);
+  TestPrintT("total_avg_time", total_avg_time);
+  TestPrintT("total_dual_time", total_dual_time);
+  printf("total_iterations %c %d\n", test_sep, k);
+
+  if (pogs_data->y != 0 && !err) {
+    T nrm = cml::blas_nrm2(d_hdl, &y12);
+    TestPrintT("y_nrm", nrm);
+  }
+  if (pogs_data->x != 0 && !err) {
+    T nrm = cml::blas_nrm2(d_hdl, &x12);
+    TestPrintT("x_nrm", nrm);
+  }
+  if (pogs_data->l != 0 && !err) {
+    T nrm = cml::blas_nrm2(d_hdl, &y);
+    TestPrintT("l_nrm", nrm);
+  }
 
   return err;
 }
@@ -282,7 +379,6 @@ template <typename T, typename I, POGS_ORD O>
 int AllocSparseFactors(PogsData<T, Sparse<T, I, O> > *pogs_data) {
   size_t m = pogs_data->m, n = pogs_data->n, nnz = pogs_data->A.nnz;
   size_t flen = 1 + 3 * (n + m) + nnz;
-  printf("flen = %lu\n", flen);
 
   Sparse<T, I, O>& A = pogs_data->factors;
   A.val = 0;
