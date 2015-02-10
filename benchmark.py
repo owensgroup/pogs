@@ -96,8 +96,15 @@ def run_plan(plan, test_settings):
                     shell=True
                 )
                 sout, serr = p.communicate()
-                print('Finished task')
-                result = parse_solver_output(sout, serr)
+                if p.returncode == 0:
+                    print('Finished task')
+                    result = parse_solver_output(sout, serr)
+                else:
+                    print('Error in task')
+                    result = {
+                        'out': sout.read(),
+                        'err': serr.read()
+                    }
                 results[test_name][task['name']].append(result)
             print('Finished tests')
     print('Finished test plan')
