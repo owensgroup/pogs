@@ -330,6 +330,19 @@ int Pogs(PogsData<T, M> *pogs_data) {
   if (pogs_data->l != 0 && !err)
     cml::vector_memcpy(pogs_data->l, &y);
 
+  if (pogs_data->y != 0 && !err) {
+    T nrm = cml::blas_nrm2(d_hdl, &y12);
+    TestPrintT("y_nrm", nrm);
+  }
+  if (pogs_data->x != 0 && !err) {
+    T nrm = cml::blas_nrm2(d_hdl, &x12);
+    TestPrintT("x_nrm", nrm);
+  }
+  if (pogs_data->l != 0 && !err) {
+    T nrm = cml::blas_nrm2(d_hdl, &y);
+    TestPrintT("l_nrm", nrm);
+  }
+
   // Store rho and free memory.
   if (pogs_data->factors.val != 0 && !err) {
     cudaMemcpy(pogs_data->factors.val, &rho, sizeof(T), cudaMemcpyHostToDevice);
@@ -359,18 +372,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
   TestPrintT("total_dual_time", total_dual_time);
   printf("total_iterations %c %d\n", test_sep, k);
 
-  if (pogs_data->y != 0 && !err) {
-    T nrm = cml::blas_nrm2(d_hdl, &y12);
-    TestPrintT("y_nrm", nrm);
-  }
-  if (pogs_data->x != 0 && !err) {
-    T nrm = cml::blas_nrm2(d_hdl, &x12);
-    TestPrintT("x_nrm", nrm);
-  }
-  if (pogs_data->l != 0 && !err) {
-    T nrm = cml::blas_nrm2(d_hdl, &y);
-    TestPrintT("l_nrm", nrm);
-  }
 
   return err;
 }
