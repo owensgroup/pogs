@@ -27,12 +27,12 @@ inline void TestPrintT(const char *name, T value) {
 
 template <typename T>
 inline void TestIterPrintT(unsigned int iter, const char *name, T value) {
-  printf("iter, %d, %s %c %.3e\n", iter, name, value);
+  printf("iter, %d, %s %c %.3e\n", iter, name, test_sep, value);
 }
 
 template <typename T>
 inline void TestIterPrintF(unsigned int iter, const char *name, T value) {
-  printf("iter, %d, %s %c %.3f\n", iter, name, value);
+  printf("iter, %d, %s %c %.3f\n", iter, name, test_sep, value);
 }
 
 // Apply operator to h.a and h.d.
