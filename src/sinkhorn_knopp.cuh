@@ -118,7 +118,6 @@ T NormEst(cusparseHandle_t s_hdl, cublasHandle_t b_hdl,
     if (abs(nrm_est_last - nrm_est) < kTol * nrm_est)
       break;
   }
-  Printf("niter = %d, nrmest = %e\n", i, nrm_est);
   cml::vector_free(&x);
   cml::vector_free(&Sx);
   return nrm_est;

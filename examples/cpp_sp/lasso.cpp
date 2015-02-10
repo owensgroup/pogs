@@ -19,6 +19,8 @@ double Lasso(int m, int n, int nnz) {
   std::vector<T> y(m);
 
   std::default_random_engine generator;
+  generator.seed(1240);
+  srand(12410);
   std::normal_distribution<T> n_dist(static_cast<T>(0),
                                      static_cast<T>(1));
  
@@ -35,6 +37,7 @@ double Lasso(int m, int n, int nnz) {
   PogsData<T, Sparse<T, int, ROW>> pogs_data(A_, m, n);
   pogs_data.x = x.data();
   pogs_data.y = y.data();
+  pogs_data.max_iter = 1000000;
 
   pogs_data.f.reserve(m);
   for (unsigned int i = 0; i < m; ++i)

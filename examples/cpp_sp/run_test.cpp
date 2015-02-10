@@ -5,7 +5,6 @@
 #include <cuda_runtime.h>
 
 #include "examples.h"
-#include "util.h"
 
 typedef double real_t;
 

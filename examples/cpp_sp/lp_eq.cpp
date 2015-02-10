@@ -20,6 +20,8 @@ double LpEq(int m, int n, int nnz) {
   std::vector<T> y(m + 1);
 
   std::default_random_engine generator;
+  generator.seed(12410);
+  srand(1240);
   std::uniform_real_distribution<T> u_dist(static_cast<T>(0),
       static_cast<T>(1));
 
