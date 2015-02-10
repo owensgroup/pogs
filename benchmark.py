@@ -2,6 +2,7 @@ import sys
 import json
 import subprocess
 import os
+import argparse
 from collections import defaultdict
 from pprint import pprint
 
@@ -59,10 +60,16 @@ def make_tests(solvers):
 def parse_solver_output(output, error):
     if error is not None:
         pass
-    result = dict()
+    rdc = lambda: defaultdict(rdc)
+    result = defaultdict(rdc)
     for line in output.splitlines():
         kv = [x.strip() for x in line.split(':')]
-        result[kv[0]] = kv[1]
+        ks = [k.strip() for k in kv[0].split(',')]
+        v = kv[1]
+        temp = result
+        for k in ks[:-1]:
+            temp = temp[k]
+        temp[ks[-1]] = v
     return result
 
 
@@ -98,34 +105,35 @@ def run_plan(plan, test_settings):
     return results
 
 
-def save_test_results(results):
+def save_test_results(results, out_fo):
+    json.dump(results, out_fo)
+
+
+def generate_test_graphs(results):
     pass
 
 
-def display_test_results(results):
-    pass
-
-
-def main(argv):
-    if len(argv) > 1:
-        spec_file = argv[1]
-    else:
-        spec_file = 'spec.json'
-
-    spec_fo = open(spec_file, 'r')
-    print('Parsing test spec')
-    spec = parse_test_spec(spec_fo)
-    spec_fo.close()
-
+def main(args):
+    with args.spec_file:
+        print('Parsing test spec')
+        spec = parse_test_spec(args.spec_file)
     print('Processing test spec')
     plan = process_test_spec(spec)
     print('Building test code')
     make_tests(spec['solvers'])
     test_results = run_plan(plan, spec['tests'])
     pprint(test_results)
-    save_test_results(test_results)
-    display_test_results(test_results)
+    with args.results_file:
+        save_test_results(test_results, args.results_file)
+    generate_test_graphs(test_results)
 
 
 if __name__ == '__main__':
-    main(sys.argv)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('spec_file',
+                        type=argparse.FileType('r'),
+                        default='spec.json')
+    parser.add_argument('results_file',
+                        type=argparse.FileType('w'),
+                        default='results.json')
+    main(parser.parse_args())

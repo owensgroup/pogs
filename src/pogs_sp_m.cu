@@ -25,6 +25,16 @@ inline void TestPrintT(const char *name, T value) {
   printf("%s %c %.3e\n", name, test_sep, value);
 }
 
+template <typename T>
+inline void TestIterPrintT(unsigned int iter, const char *name, T value) {
+  printf("iter, %d, %s %c %.3e\n", iter, name, value);
+}
+
+template <typename T>
+inline void TestIterPrintF(unsigned int iter, const char *name, T value) {
+  printf("iter, %d, %s %c %.3f\n", iter, name, value);
+}
+
 // Apply operator to h.a and h.d.
 template <typename T, typename Op>
 struct ApplyOp: thrust::binary_function<FunctionObj<T>, FunctionObj<T>, T> {
@@ -776,6 +786,15 @@ int Pogs(PogsData<T, M> *pogs_data) {
       Printf("%4d :  %.3e  %.3e  %.3e  %.3e  %.3e  %.3e  %.3e\n",
           k, nrm_r, eps_pri, nrm_s, eps_dua, gap, eps_gap, pogs_data->optval);
 
+#ifdef POGS_TEST
+    if (kRank == 0) {
+      TestIterPrintF(k, "nrm_r", nrm_r);
+      TestIterPrintF(k, "eps_pri", eps_pri);
+      TestIterPrintF(k, "nrm_s", nrm_s);
+      TestIterPrintF(k, "eps_dua", eps_dua);
+    }
+#endif
+
     // Rescale rho.
     if (pogs_data->adaptive_rho && !converged) {
       if (nrm_s < xi * eps_dua && nrm_r > xi * eps_pri &&
@@ -1007,11 +1026,11 @@ int Pogs(PogsData<T, M> *pogs_data) {
     if (!pogs_data->quiet) {
       Printf("Final norms |\n");
       if (x_nrm != -1)
-        Printf("         x  | %.3e\n", x_nrm);
+        Printf("         x  | %.3f\n", x_nrm);
       if (y_nrm != -1)
-        Printf("         y  | %.3e\n", y_nrm);
+        Printf("         y  | %.3f\n", y_nrm);
       if (l_nrm != -1)
-        Printf("         l  | %.3e\n", l_nrm);
+        Printf("         l  | %.3f\n", l_nrm);
     }
 #endif
   }
