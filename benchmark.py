@@ -130,6 +130,6 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('spec_file', default='spec.json')
-    parser.add_argument('results_file', default='results.json')
+    parser.add_argument('spec_file', nargs='?', default='spec.json')
+    parser.add_argument('results_file', nargs='?', default='results.json')
     main(parser.parse_args())
