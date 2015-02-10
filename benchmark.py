@@ -121,7 +121,6 @@ def main(args):
     print('Building test code')
     make_tests(spec['solvers'])
     test_results = run_plan(plan, spec['tests'])
-    pprint(test_results)
     print('Saving results to ' + args.results_file)
     with open(args.results_file, 'w') as results_fo:
         save_test_results(test_results, results_fo)
