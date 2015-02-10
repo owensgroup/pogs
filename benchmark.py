@@ -1,4 +1,3 @@
-import sys
 import json
 import subprocess
 import os
@@ -114,26 +113,23 @@ def generate_test_graphs(results):
 
 
 def main(args):
-    with args.spec_file:
-        print('Parsing test spec')
-        spec = parse_test_spec(args.spec_file)
+    print('Parsing test spec')
+    with open(args.spec_file, 'r') as spec_fo:
+        spec = parse_test_spec(spec_fo)
     print('Processing test spec')
     plan = process_test_spec(spec)
     print('Building test code')
     make_tests(spec['solvers'])
     test_results = run_plan(plan, spec['tests'])
     pprint(test_results)
-    with args.results_file:
-        save_test_results(test_results, args.results_file)
+    print('Saving results to ' + args.results_file)
+    with open(args.results_file, 'w') as results_fo:
+        save_test_results(test_results, results_fo)
     generate_test_graphs(test_results)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('spec_file',
-                        type=argparse.FileType('r'),
-                        default='spec.json')
-    parser.add_argument('results_file',
-                        type=argparse.FileType('w'),
-                        default='results.json')
+    parser.add_argument('spec_file', default='spec.json')
+    parser.add_argument('results_file', default='results.json')
     main(parser.parse_args())
