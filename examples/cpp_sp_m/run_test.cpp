@@ -92,9 +92,9 @@ int main(int argc, char **argv) {
     break;
   }
 
-  problem(m_nodes, m, n, nnz);
+  double ret = problem(m_nodes, m, n, nnz);
 
   MPI_Finalize();
   
-  return 0;
+  return static_cast<int>(ret);
 }

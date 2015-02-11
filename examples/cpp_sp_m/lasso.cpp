@@ -48,6 +48,7 @@ double Lasso(int m_nodes, int m, int n, int nnz) {
   PogsData<T, Sparse<T, int, ROW>> pogs_data(A_, m, n);
   pogs_data.x = x.data();
   pogs_data.y = y.data();
+  pogs_data.max_iter = 1000000;
   pogs_data.m_nodes = m_nodes;
   pogs_data.n_nodes = 1;
   pogs_data.quiet = true;
@@ -63,9 +64,17 @@ double Lasso(int m_nodes, int m, int n, int nnz) {
   }
 
   double t = timer<double>();
-  Pogs(&pogs_data);
+  int error = Pogs(&pogs_data);
+  t = timer<double>() - t;
 
-  return timer<double>() - t;
+  double ret;
+  if (error == 0) {
+    ret = t;
+  } else {
+    ret = -1;
+  }
+
+  return ret;
 }
 
 template double Lasso<double>(int m_nodes, int m, int n, int nnz);

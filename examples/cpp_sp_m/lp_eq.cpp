@@ -80,9 +80,17 @@ double LpEq(int m_nodes, int m, int n, int nnz) {
   }
 
   double t = timer<double>();
-  Pogs(&pogs_data);
+  int error = Pogs(&pogs_data);
+  t = timer<double>() - t;
 
-  return timer<double>() - t;
+  double ret;
+  if (error == 0) {
+    ret = t;
+  } else {
+    ret = -1;
+  }
+
+  return ret;
 }
 
 template double LpEq<double>(int m_nodes, int m, int n, int nnz);
