@@ -101,8 +101,8 @@ def run_plan(plan, test_settings):
                 else:
                     print('Error in task')
                     result = {
-                        'out': sout.read(),
-                        'err': serr.read()
+                        'out': sout,
+                        'err': serr
                     }
                 results[test_name][task['name']].append(result)
             print('Finished tests')
