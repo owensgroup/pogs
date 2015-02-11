@@ -3,7 +3,6 @@ import subprocess
 import os
 import argparse
 from collections import defaultdict
-from pprint import pprint
 
 test_args_template = '{typ} {M} {N} {nnz}'
 
