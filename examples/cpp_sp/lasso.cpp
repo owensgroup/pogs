@@ -48,9 +48,17 @@ double Lasso(int m, int n, int nnz) {
     pogs_data.g.emplace_back(kAbs, static_cast<T>(0.5) * lambda_max);
 
   double t = timer<double>();
-  Pogs(&pogs_data);
+  int error = Pogs(&pogs_data);
+  t = timer<double>() - t;
 
-  return timer<double>() - t;
+  double ret;
+  if (error == 0) {
+    ret = t;
+  } else {
+    ret = -1;
+  }
+
+  return ret;
 }
 
 template double Lasso<double>(int m, int n, int nnz);

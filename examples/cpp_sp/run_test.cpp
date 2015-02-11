@@ -82,8 +82,8 @@ int main(int argc, char **argv) {
     break;
   }
 
-  problem(m, n, nnz);
+  double ret = problem(m, n, nnz);
   
-  return 0;
+  return static_cast<int>(ret);
 }
 
