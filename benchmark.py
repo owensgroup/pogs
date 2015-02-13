@@ -99,7 +99,7 @@ def run_plan(plan, test_settings):
                     print('Finished task')
                     result = parse_solver_output(sout, serr)
                 else:
-                    print('Error in task')
+                    print('Error in task, return code: ' + str(p.returncode))
                     result = {
                         'out': sout,
                         'err': serr
