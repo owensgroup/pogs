@@ -1,10 +1,17 @@
+from __future__ import print_function
+from collections import defaultdict
+from datetime import datetime
+
 import json
 import subprocess
 import os
 import argparse
-from collections import defaultdict
 
 test_args_template = '{typ} {M} {N} {nnz}'
+
+
+def tprint(*args, **kwargs):
+    print('[' + str(datetime.now()) + ']', *args, **kwargs)
 
 # choose solvers (single directory compiled code)
 
@@ -63,8 +70,8 @@ def parse_solver_output(output, error):
     for line in output.splitlines():
         kv = [x.strip() for x in line.split(':')]
         if len(kv) != 2:
-            print('Error parsing task output, offending line follows')
-            print(line)
+            tprint('Error parsing task output, offending line follows')
+            tprint(line)
             return {
                 'out': output,
                 'err': error
@@ -79,21 +86,21 @@ def parse_solver_output(output, error):
 
 
 def run_plan(plan, test_settings):
-    print('Starting test plan')
+    tprint('Starting test plan')
     results = defaultdict(lambda: defaultdict(list))
     for test_name, tests in plan.iteritems():
         settings = test_settings[test_name]
         typ = settings['type']
-        print('')
+        tprint('Starting test', test_name)
         for param in settings['params']:
             M = param['M']
             N = param['N']
             nnz = int(int(M) * int(N) * float(param['density']))
             args = test_args_template.format(typ=typ, M=M, N=N, nnz=nnz)
-            print('Starting tests for args: ' + args)
+            tprint('Starting tasks for args:', args)
             for task in tests:
                 cmd = task['run'] + ' ' + args
-                print('Running task with run cmd: ' + cmd)
+                tprint('Running task with run cmd:', cmd)
                 p = subprocess.Popen(
                     cmd,
                     cwd=task['directory'],
@@ -103,17 +110,18 @@ def run_plan(plan, test_settings):
                 )
                 sout, serr = p.communicate()
                 if p.returncode == 0:
-                    print('Finished task')
+                    tprint('Finished task')
                     result = parse_solver_output(sout, serr)
                 else:
-                    print('Error in task, return code: ' + str(p.returncode))
+                    tprint('Error in task, return code:', str(p.returncode))
                     result = {
                         'out': sout,
                         'err': serr
                     }
                 results[test_name][task['name']].append(result)
-            print('Finished tests')
-    print('Finished test plan')
+            tprint('Finished tasks')
+        tprint('Finished test')
+    tprint('Finished test plan')
     return results
 
 
@@ -126,15 +134,15 @@ def generate_test_graphs(results):
 
 
 def main(args):
-    print('Parsing test spec')
+    tprint('Parsing test spec')
     with open(args.spec_file, 'r') as spec_fo:
         spec = parse_test_spec(spec_fo)
-    print('Processing test spec')
+    tprint('Processing test spec')
     plan = process_test_spec(spec)
-    print('Building test code')
+    tprint('Building test code')
     make_tests(spec['solvers'])
     test_results = run_plan(plan, spec['tests'])
-    print('Saving results to ' + args.results_file)
+    tprint('Saving results to', args.results_file)
     with open(args.results_file, 'w') as results_fo:
         save_test_results(test_results, results_fo)
     generate_test_graphs(test_results)
