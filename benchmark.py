@@ -62,6 +62,13 @@ def parse_solver_output(output, error):
     result = defaultdict(rdc)
     for line in output.splitlines():
         kv = [x.strip() for x in line.split(':')]
+        if len(kv) != 2:
+            print('Error parsing task output, offending line follows')
+            print(line)
+            return {
+                'out': output,
+                'err': error
+            }
         ks = [k.strip() for k in kv[0].split(',')]
         v = kv[1]
         temp = result
