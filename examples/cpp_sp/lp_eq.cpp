@@ -40,6 +40,7 @@ double LpEq(int m, int n, int nnz) {
   Sparse<T, int, ROW> A_(val.data(), row_ptr.data(), col_ind.data(), nnz);
   PogsData<T, Sparse<T, int, ROW>> pogs_data(A_, m + 1, n);
   pogs_data.x = x.data();
+  pogs_data.max_iter = 1000000;
 
   // Generate b according to:
   //   v = rand(n, 1)
