@@ -2,9 +2,10 @@ from __future__ import print_function
 from collections import defaultdict
 from datetime import datetime
 
+import time
+import os
 import json
 import subprocess
-import os
 import argparse
 
 test_args_template = '{typ} {M} {N} {nnz}'
@@ -134,6 +135,7 @@ def generate_test_graphs(results):
 
 
 def main(args):
+    start_time = time.time()
     tprint('Parsing test spec')
     with open(args.spec_file, 'r') as spec_fo:
         spec = parse_test_spec(spec_fo)
@@ -146,6 +148,7 @@ def main(args):
     with open(args.results_file, 'w') as results_fo:
         save_test_results(test_results, results_fo)
     generate_test_graphs(test_results)
+    tprint('Script took', time.time() - start_time, 'seconds')
 
 
 if __name__ == '__main__':
