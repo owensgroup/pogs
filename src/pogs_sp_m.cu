@@ -679,7 +679,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::blas_axpy(d_hdl, -kOne, &x12, &xh);
     cml::blas_dot(d_hdl, &z, &z12, &gap);
     gap = std::abs(gap);
-    pogs_data->optval = FuncEval(f, y12.data, 1) + FuncEval(g, x12.data, 1);
 
     global_z_time = timer<double>();
     // Calculate global z norm
@@ -765,6 +764,11 @@ int Pogs(PogsData<T, M> *pogs_data) {
       cml::vector_memcpy(&xh, &x);
     }
 
+    pogs_data->optval = FuncEval(f, y12.data, 1);
+    T topt;
+    mpiu::Allreduce(&pogs_data->optval, &topt, 1, MPI_SUM, MPI_COMM_WORLD);
+    pogs_data->optval = topt + FuncEval(g, xh.data, 1);
+
     cml::blas_axpy(d_hdl, -kOne, &zprev, &z12);
     cml::blas_axpy(d_hdl, -kOne, &z, &zprev);
     
@@ -788,6 +792,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
 #ifdef POGS_TEST
     if (kRank == 0) {
+      TestIterPrintF(k, "optval", pogs_data->optval);
       TestIterPrintF(k, "nrm_r", nrm_r);
       TestIterPrintF(k, "eps_pri", eps_pri);
       TestIterPrintF(k, "nrm_s", nrm_s);
