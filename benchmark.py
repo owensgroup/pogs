@@ -5,7 +5,7 @@ from datetime import datetime
 import time
 import os
 import json
-import subprocess
+import subprocess32 as subprocess
 import argparse
 
 test_args_template = '{typ} {M} {N} {nnz}'
@@ -109,7 +109,13 @@ def run_plan(plan, test_settings):
                     stderr=subprocess.PIPE,
                     shell=True
                 )
-                sout, serr = p.communicate()
+                tout = 60 * 60
+                try:
+                    sout, serr = p.communicate(timeout=tout)
+                except subprocess.TimeoutExpired:
+                    p.kill()
+                    tprint('Task timed out after', tout, 'seconds')
+                    sout, serr = p.communicate()
                 if p.returncode == 0:
                     tprint('Finished task')
                     result = parse_solver_output(sout, serr)
