@@ -4,9 +4,15 @@ from datetime import datetime
 
 import time
 import os
+import sys
+import signal
 import json
 import subprocess32 as subprocess
 import argparse
+
+# Need a global plan results to save partial results when interrupted
+cmd_args = None
+plan_results = None
 
 test_args_template = '{typ} {M} {N} {nnz}'
 
@@ -87,8 +93,10 @@ def parse_solver_output(output, error):
 
 
 def run_plan(plan, test_settings):
+    global plan_results
+
     tprint('Starting test plan')
-    results = defaultdict(lambda: defaultdict(list))
+    plan_results = defaultdict(lambda: defaultdict(list))
     for test_name, tests in plan.iteritems():
         settings = test_settings[test_name]
         typ = settings['type']
@@ -125,11 +133,11 @@ def run_plan(plan, test_settings):
                         'out': sout,
                         'err': serr
                     }
-                results[test_name][task['name']].append(result)
+                plan_results[test_name][task['name']].append(result)
             tprint('Finished tasks')
         tprint('Finished test')
     tprint('Finished test plan')
-    return results
+    return plan_results
 
 
 def save_test_results(results, out_fo):
@@ -157,8 +165,20 @@ def main(args):
     tprint('Script took', time.time() - start_time, 'seconds')
 
 
+def sigint_handler(signal, frame):
+    tprint('Sigint received, exiting')
+    if plan_results is not None:
+        tprint('Saving partial results')
+        with open(cmd_args.results_file, 'w') as results_fo:
+            save_test_results(plan_results, results_fo)
+    sys.exit(0)
+
+
 if __name__ == '__main__':
+    signal.signal(signal.SIGINT, sigint_handler)
+
     parser = argparse.ArgumentParser()
     parser.add_argument('spec_file', nargs='?', default='spec.json')
     parser.add_argument('results_file', nargs='?', default='results.json')
-    main(parser.parse_args())
+    cmd_args = parser.parse_args()
+    main(cmd_args)
