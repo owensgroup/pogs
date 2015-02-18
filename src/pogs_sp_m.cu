@@ -792,6 +792,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
 #ifdef POGS_TEST
     if (kRank == 0) {
+      TestIterPrintF(k, "rho", rho);
       TestIterPrintF(k, "optval", pogs_data->optval);
       TestIterPrintF(k, "nrm_r", nrm_r);
       TestIterPrintF(k, "eps_pri", eps_pri);
