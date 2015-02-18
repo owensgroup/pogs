@@ -279,6 +279,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
       Printf("%4d :  %.3e  %.3e  %.3e  %.3e  %.3e  %.3e  %.3e\n",
           k, nrm_r, eps_pri, nrm_s, eps_dua, gap, eps_gap, pogs_data->optval);
 
+    TestIterPrintF(k, "rho", rho);
     TestIterPrintF(k, "optval", pogs_data->optval);
     TestIterPrintF(k, "nrm_r", nrm_r);
     TestIterPrintF(k, "eps_pri", eps_pri);
