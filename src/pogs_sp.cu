@@ -324,6 +324,9 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cml::vector_mul(&y, &d);
   cml::blas_scal(d_hdl, rho, &y);
 
+
+  pogs_data->optval = FuncEval(f, y12.data, 1) + FuncEval(g, x12.data, 1);
+    
   // Copy results to output.
   if (pogs_data->y != 0 && !err)
     cml::vector_memcpy(pogs_data->y, &y12);
@@ -358,6 +361,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   cml::vector_free(&z12);
   cml::vector_free(&zprev);
   
+  TestPrintT("final_optval", pogs_data->optval);
   TestPrintT("total_time", timer<double>() - total_time);
   TestPrintT("bcast_meta_time", bcast_meta_time);
   TestPrintT("total_iter_time", total_iter_time);
