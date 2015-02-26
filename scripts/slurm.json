@@ -1,0 +1,67 @@
+{
+    "solvers": [
+        {
+            "name": "pogs_single",
+            "directory": "~/repos/pogs-test/examples/cpp_sp/",
+            "run": "./run_test",
+            "tests": ["lasso_mn", "lp_mn"]
+        },
+        {
+            "name": "pogs_row_2",
+            "directory": "~/repos/pogs/examples/cpp_sp_m/",
+            "run": "mpirun -q -np 2 ./run_test 2",
+            "tests": ["lasso_mn", "lp_mn"]
+        },
+        {
+            "name": "pogs_row_4",
+            "directory": "~/repos/pogs/examples/cpp_sp_m/",
+            "run": "mpirun -q -np 4 ./run_test 4",
+            "tests": ["lasso_mn", "lp_mn"]
+        },
+        {
+            "name": "pogs_row_8",
+            "directory": "~/repos/pogs/examples/cpp_sp_m/",
+            "run": "mpirun -q -np 8 ./run_test 8",
+            "tests": ["lasso_mn", "lp_mn"]
+        },
+        {
+            "name": "pogs_row_16",
+            "directory": "~/repos/pogs/examples/cpp_sp_m/",
+            "run": "mpirun -q -np 16 ./run_test 16",
+            "tests": ["lasso_mn", "lp_mn"]
+        }
+    ],
+    
+    "tests": {
+        "lasso_mn": {
+            "type": "lasso",
+            "params": [
+                {
+                    "M": "1024",
+                    "N": "16384",
+                    "density": "0.05"
+                },
+                {
+                    "M": "2048",
+                    "N": "32768",
+                    "density": "0.05"
+                }
+            ]
+        },
+        "lp_mn": {
+            "type": "lp",
+            "params": [
+                {
+                    "M": "2048",
+                    "N": "1024",
+                    "density": "0.05"
+                },
+                {
+                    "M": "4096",
+                    "N": "2048",
+                    "density": "0.05"
+                }
+            ]
+        }
+    }
+}

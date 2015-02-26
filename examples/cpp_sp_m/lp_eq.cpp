@@ -55,7 +55,6 @@ double LpEq(int m_nodes, int m, int n, int nnz) {
   pogs_data.m_nodes = m_nodes;
   pogs_data.n_nodes = 1;
   pogs_data.max_iter = 1000000;
-  pogs_data.quiet = true;
 
   // Generate b according to:
   //   v = rand(n, 1)

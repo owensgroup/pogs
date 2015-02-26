@@ -93,6 +93,9 @@ int main(int argc, char **argv) {
   }
 
   double ret = problem(m_nodes, m, n, nnz);
+  if (ret != -1) {
+      ret = 0;
+  }
 
   MPI_Finalize();
   

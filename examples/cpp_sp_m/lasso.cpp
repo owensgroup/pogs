@@ -51,7 +51,7 @@ double Lasso(int m_nodes, int m, int n, int nnz) {
   pogs_data.max_iter = 1000000;
   pogs_data.m_nodes = m_nodes;
   pogs_data.n_nodes = 1;
-  pogs_data.quiet = true;
+  pogs_data.max_iter = 1000000;
 
   MASTER(kRank) {
     pogs_data.f.reserve(m);
