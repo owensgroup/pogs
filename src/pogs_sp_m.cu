@@ -852,6 +852,12 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
   cml::blas_scal(d_hdl, rho, &y);
 
+  pogs_data->optval = FuncEval(f, y12.data, 1);
+  T topt;
+  mpiu::Allreduce(&pogs_data->optval, &topt, 1, MPI_SUM, MPI_COMM_WORLD);
+  pogs_data->optval = topt + FuncEval(g, xh.data, 1);
+  
+
   // Copy results to output.
   // Collect x and y final values
   // todo(abpoms): Don't assume that all nodes have the same size f and g.
@@ -971,6 +977,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
   if (kRank == 0) {
 #ifdef POGS_TEST
+    TestPrintT("final_optval", pogs_data->optval);
     TestPrintT("total_time", timer<double>() - total_time);
     TestPrintT("bcast_meta_time", bcast_meta_time);
     TestPrintT("total_iter_time", total_iter_time);
