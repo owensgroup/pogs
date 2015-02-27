@@ -739,6 +739,70 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::blas_axpy(d_hdl, kOne - kAlpha, &zprev, &zt);
     cml::blas_axpy(d_hdl, -kOne, &z, &zt);
 
+
+    cml::blas_axpy(d_hdl, -kOne, &zprev, &z12);
+    cml::blas_axpy(d_hdl, -kOne, &z, &zprev);
+    
+    dual_time = timer<double>();
+    // Calculate global A'y12 + x12
+    cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_TRANSPOSE, descr, kOne, &A,
+                     &y12, kOne, &x12);
+    nrm_s = cml::blas_dot(d_hdl, &x12, &x12);
+    cudaDeviceSynchronize();
+    mpiu::Allreduce(&nrm_s, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
+    nrm_s = rho * sqrtf(temp);
+    dual_time = timer<double>() - dual_time;
+    total_dual_time += dual_time;
+
+    // Evaluate stopping criteria.
+    converged = nrm_r < eps_pri && nrm_s < eps_dua &&
+        (!pogs_data->gap_stop || gap < eps_gap);
+    if (!pogs_data->quiet && (k % 10 == 0 || converged))
+      Printf("%4d :  %.3e  %.3e  %.3e  %.3e  %.3e  %.3e  %.3e\n",
+          k, nrm_r, eps_pri, nrm_s, eps_dua, gap, eps_gap, pogs_data->optval);
+
+
+    // Rescale rho.
+    if (pogs_data->adaptive_rho && !converged) {
+      if (nrm_s < xi * eps_dua && nrm_r > xi * eps_pri &&
+          kTau * static_cast<T>(k) > static_cast<T>(kd)) {
+        if (rho < kRhoMax) {
+          rho *= delta;
+          cml::blas_scal(d_hdl, 1 / delta, &zt);
+          delta = kGamma * delta;
+          ku = k;
+          if (!pogs_data->quiet)
+            Printf("+ rho %e\n", rho);
+        }
+      } else if (nrm_s > xi * eps_dua && nrm_r < xi * eps_pri &&
+          kTau * static_cast<T>(k) > static_cast<T>(ku)) {
+        if (rho > kRhoMin) {
+          rho /= delta;
+          cml::blas_scal(d_hdl, delta, &zt);
+          delta = kGamma * delta;
+          kd = k;
+          if (!pogs_data->quiet)
+            Printf("- rho %e\n", rho);
+        }
+      } else if (nrm_s < xi * eps_dua && nrm_r < xi * eps_pri) {
+        xi *= kKappa;
+      } else {
+        delta = std::max(delta / kGamma, kDeltaMin);
+      }
+    }
+    if (kRank == 0 && !pogs_data->quiet) {
+      iter_time = timer<double>() - iter_time;
+      /*Printf("TIME |   prox   | global_z | global_z12 |    proj   | primal \n" \
+             "      %.3f  %.3f  %.3f    %.3f     %.3f\n" \
+             "     |   avg    | dual_approx |   dual   \n" \
+             "      %.3f  %.3f     %.3f\n",
+             prox_time/iter_time, global_z_time/iter_time,
+             global_z12_time/iter_time, proj_time/iter_time,
+             primal_time/iter_time, avg_time/iter_time,
+             dual_approx_time/iter_time, dual_time/iter_time);*/
+      Printf("ITER %d TIME: %.3e\n", k, iter_time);
+    }
+
     // Average
     if (m_nodes > 1) {
       avg_time = timer<double>();
@@ -769,27 +833,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
     mpiu::Allreduce(&pogs_data->optval, &topt, 1, MPI_SUM, MPI_COMM_WORLD);
     pogs_data->optval = topt + FuncEval(g, xh.data, 1);
 
-    cml::blas_axpy(d_hdl, -kOne, &zprev, &z12);
-    cml::blas_axpy(d_hdl, -kOne, &z, &zprev);
-    
-    dual_time = timer<double>();
-    // Calculate global A'y12 + x12
-    cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_TRANSPOSE, descr, kOne, &A,
-                     &y12, kOne, &x12);
-    nrm_s = cml::blas_dot(d_hdl, &x12, &x12);
-    cudaDeviceSynchronize();
-    mpiu::Allreduce(&nrm_s, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
-    nrm_s = rho * sqrtf(temp);
-    dual_time = timer<double>() - dual_time;
-    total_dual_time += dual_time;
-
-    // Evaluate stopping criteria.
-    converged = nrm_r < eps_pri && nrm_s < eps_dua &&
-        (!pogs_data->gap_stop || gap < eps_gap);
-    if (!pogs_data->quiet && (k % 10 == 0 || converged))
-      Printf("%4d :  %.3e  %.3e  %.3e  %.3e  %.3e  %.3e  %.3e\n",
-          k, nrm_r, eps_pri, nrm_s, eps_dua, gap, eps_gap, pogs_data->optval);
-
 #ifdef POGS_TEST
     if (kRank == 0) {
       TestIterPrintF(k, "rho", rho);
@@ -801,48 +844,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
     }
 #endif
 
-    // Rescale rho.
-    if (pogs_data->adaptive_rho && !converged) {
-      if (nrm_s < xi * eps_dua && nrm_r > xi * eps_pri &&
-          kTau * static_cast<T>(k) > static_cast<T>(kd)) {
-        if (rho < kRhoMax) {
-          rho *= delta;
-          cml::blas_scal(d_hdl, 1 / delta, &zt);
-          cml::blas_scal(d_hdl, 1 / delta, &xh);
-          delta = kGamma * delta;
-          ku = k;
-          if (!pogs_data->quiet)
-            Printf("+ rho %e\n", rho);
-        }
-      } else if (nrm_s > xi * eps_dua && nrm_r < xi * eps_pri &&
-          kTau * static_cast<T>(k) > static_cast<T>(ku)) {
-        if (rho > kRhoMin) {
-          rho /= delta;
-          cml::blas_scal(d_hdl, delta, &zt);
-          cml::blas_scal(d_hdl, delta, &xh);
-          delta = kGamma * delta;
-          kd = k;
-          if (!pogs_data->quiet)
-            Printf("- rho %e\n", rho);
-        }
-      } else if (nrm_s < xi * eps_dua && nrm_r < xi * eps_pri) {
-        xi *= kKappa;
-      } else {
-        delta = std::max(delta / kGamma, kDeltaMin);
-      }
-    }
-    if (kRank == 0 && !pogs_data->quiet) {
-      iter_time = timer<double>() - iter_time;
-      /*Printf("TIME |   prox   | global_z | global_z12 |    proj   | primal \n" \
-             "      %.3f  %.3f  %.3f    %.3f     %.3f\n" \
-             "     |   avg    | dual_approx |   dual   \n" \
-             "      %.3f  %.3f     %.3f\n",
-             prox_time/iter_time, global_z_time/iter_time,
-             global_z12_time/iter_time, proj_time/iter_time,
-             primal_time/iter_time, avg_time/iter_time,
-             dual_approx_time/iter_time, dual_time/iter_time);*/
-      Printf("ITER %d TIME: %.3e\n", k, iter_time);
-    }
   }
   total_iter_time = timer<double>() - total_iter_time;
   if (!pogs_data->quiet) {
