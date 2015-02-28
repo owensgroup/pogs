@@ -739,12 +739,14 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::blas_axpy(d_hdl, kOne - kAlpha, &zprev, &zt);
     cml::blas_axpy(d_hdl, -kOne, &z, &zt);
 
+    pogs_data->optval = FuncEval(f, y12.data, 1);
+    T topt;
+    mpiu::Allreduce(&pogs_data->optval, &topt, 1, MPI_SUM, MPI_COMM_WORLD);
+    pogs_data->optval = topt + FuncEval(g, x12.data, 1);
 
-    cml::blas_axpy(d_hdl, -kOne, &zprev, &z12);
-    cml::blas_axpy(d_hdl, -kOne, &z, &zprev);
-    
     dual_time = timer<double>();
     // Calculate global A'y12 + x12
+    cml::blas_axpy(d_hdl, -kOne, &zprev, &z12);
     cml::spblas_gemv(s_hdl, CUSPARSE_OPERATION_TRANSPOSE, descr, kOne, &A,
                      &y12, kOne, &x12);
     nrm_s = cml::blas_dot(d_hdl, &x12, &x12);
@@ -828,10 +830,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
       cml::vector_memcpy(&xh, &x);
     }
 
-    pogs_data->optval = FuncEval(f, y12.data, 1);
-    T topt;
-    mpiu::Allreduce(&pogs_data->optval, &topt, 1, MPI_SUM, MPI_COMM_WORLD);
-    pogs_data->optval = topt + FuncEval(g, xh.data, 1);
 
 #ifdef POGS_TEST
     if (kRank == 0) {
@@ -856,7 +854,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
   pogs_data->optval = FuncEval(f, y12.data, 1);
   T topt;
   mpiu::Allreduce(&pogs_data->optval, &topt, 1, MPI_SUM, MPI_COMM_WORLD);
-  pogs_data->optval = topt + FuncEval(g, xh.data, 1);
+  pogs_data->optval = topt + FuncEval(g, x12.data, 1);
   
 
   // Copy results to output.
