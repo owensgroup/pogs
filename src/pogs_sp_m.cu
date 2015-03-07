@@ -732,14 +732,12 @@ int Pogs(PogsData<T, M> *pogs_data) {
     total_proj_time += proj_time;
 
     // Apply over relaxation.
-    //cml::blas_scal(d_hdl, kAlpha, &z);
-    //cml::blas_axpy(d_hdl, kOne - kAlpha, &zprev, &z);
+    cml::blas_scal(d_hdl, kAlpha, &z);
+    cml::blas_axpy(d_hdl, kOne - kAlpha, &zprev, &z);
 
     // Update dual variable.
-    //cml::blas_axpy(d_hdl, kAlpha, &z12, &zt);
-    //cml::blas_axpy(d_hdl, kOne - kAlpha, &zprev, &zt);
-    //cml::blas_axpy(d_hdl, -kOne, &z, &zt);
-    cml::blas_axpy(d_hdl, kOne, &z12, &zt);
+    cml::blas_axpy(d_hdl, kAlpha, &z12, &zt);
+    cml::blas_axpy(d_hdl, kOne - kAlpha, &zprev, &zt);
     cml::blas_axpy(d_hdl, -kOne, &z, &zt);
 
     pogs_data->optval = FuncEval(f, y12.data, 1);
