@@ -809,30 +809,25 @@ int Pogs(PogsData<T, M> *pogs_data) {
     }
 
     // Average
-    if (m_nodes > 1) {
-      avg_time = timer<double>();
-      cml::vector_memcpy(&xhtmp, &x);
-      cml::blas_axpy(d_hdl, -kOne, &xt, &xhtmp);
+    avg_time = timer<double>();
+    cml::vector_memcpy(&xhtmp, &x);
+    cml::blas_axpy(d_hdl, -kOne, &xt, &xhtmp);
 #ifndef POGS_OMPI_CUDA
-      cudaMemcpy(xhtmp_h.data(), xhtmp.data, xhtmp.size,
-                 cudaMemcpyDeviceToHost);
-      mpiu::Allreduce(xhtmp_h.data(), xh_h.data(), xh_h.size(), MPI_SUM,
-                      MPI_COMM_WORLD);
-      cudaMemcpy(xh.data, xh_h.data(), xh_h.size(), cudaMemcpyHostToDevice);
+    cudaMemcpy(xhtmp_h.data(), xhtmp.data, xhtmp.size,
+               cudaMemcpyDeviceToHost);
+    mpiu::Allreduce(xhtmp_h.data(), xh_h.data(), xh_h.size(), MPI_SUM,
+                    MPI_COMM_WORLD);
+    cudaMemcpy(xh.data, xh_h.data(), xh_h.size(), cudaMemcpyHostToDevice);
 #else
-      cudaDeviceSynchronize();
-      mpiu::Allgather(xhtmp.data, xhtmp.size, gather_buf.data, xhtmp.size,
-                MPI_COMM_WORLD);
-      cml::blas_gemv(d_hdl, CUBLAS_OP_T, kOne, &gather_buf, &identity, kZero,
-                     &xh);
+    cudaDeviceSynchronize();
+    mpiu::Allgather(xhtmp.data, xhtmp.size, gather_buf.data, xhtmp.size,
+                    MPI_COMM_WORLD);
+    cml::blas_gemv(d_hdl, CUBLAS_OP_T, kOne, &gather_buf, &identity, kZero,
+                   &xh);
 #endif
-      cml::blas_scal(d_hdl, 1.0 / m_nodes, &xh);
-      avg_time = timer<double>() - avg_time;
-      total_avg_time += avg_time;
-    } else {
-      cml::vector_memcpy(&xh, &x);
-    }
-
+    cml::blas_scal(d_hdl, 1.0 / m_nodes, &xh);
+    avg_time = timer<double>() - avg_time;
+    total_avg_time += avg_time;
 
 #ifdef POGS_TEST
     if (kRank == 0) {
