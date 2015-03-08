@@ -220,19 +220,21 @@ struct SendSubMatricesHelper<T, I, ROW> {
     } else {
       num_f = m_sub;
     }
-    pogs_data->f.clear();
-    pogs_data->f.reserve(num_f);
+    std::vector<FunctionObj<T> > f;
+    f.reserve(num_f);
     for (int i = 0; i < num_f; ++i) {
-      RecvFunctionObj(pogs_data->f);
+      RecvFunctionObj(f);
     }
+    pogs_data->f = f;
 
     // Receive g operators
     int num_g = pogs_data->n;
-    pogs_data->g.clear();
-    pogs_data->g.reserve(num_g);
+    std::vector<FunctionObj<T> > g;
+    g.reserve(num_g);
     for (int i = 0; i < num_g; ++i) {
       RecvFunctionObj(pogs_data->g);
     }
+    pogs_data->g = g;
   }
 };
 
