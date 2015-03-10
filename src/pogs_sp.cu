@@ -282,6 +282,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
     TestIterPrintF(k, "rho", rho);
     TestIterPrintF(k, "optval", pogs_data->optval);
     TestIterPrintF(k, "nrm_r", nrm_r);
+    TestIterPrintF(k, "nrm_z", nrm_z);
+    TestIterPrintF(k, "nrm_z12", nrm_z12);
     TestIterPrintF(k, "eps_pri", eps_pri);
     TestIterPrintF(k, "nrm_s", nrm_s);
     TestIterPrintF(k, "eps_dua", eps_dua);
