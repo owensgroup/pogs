@@ -679,7 +679,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
     total_prox_time += prox_time;
     
     // Compute dual variable.
-    T nrm_r = 0, nrm_s = 0, gap, z_nrm, z12_nrm, temp;
+    T nrm_r = 0, nrm_s = 0, gap, nrm_z, nrm_z12, temp;
     cml::blas_axpy(d_hdl, -kOne, &z12, &z);
     cml::blas_axpy(d_hdl, -kOne, &x12, &xh);
     cml::blas_dot(d_hdl, &z, &z12, &gap);
@@ -687,26 +687,26 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
     global_z_time = timer<double>();
     // Calculate global z norm
-    z_nrm = cml::blas_dot(d_hdl, &y, &y);
+    nrm_z = cml::blas_dot(d_hdl, &y, &y);
     cudaDeviceSynchronize();
-    mpiu::Allreduce(&z_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
-    z_nrm = sqrtf(cml::blas_dot(d_hdl, &xh, &xh) + temp);
+    mpiu::Allreduce(&nrm_z, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
+    nrm_z = sqrtf(cml::blas_dot(d_hdl, &xh, &xh) + temp);
     global_z_time = timer<double>() - global_z_time;
     total_global_z_time += global_z_time;
 
     global_z12_time = timer<double>();
     // Calculate global z12 norm
-    z12_nrm = cml::blas_dot(d_hdl, &y12, &y12);
+    nrm_z12 = cml::blas_dot(d_hdl, &y12, &y12);
     cudaDeviceSynchronize();
-    mpiu::Allreduce(&z12_nrm, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
-    z12_nrm = sqrtf(cml::blas_dot(d_hdl, &x12, &x12) + temp);
+    mpiu::Allreduce(&nrm_z12, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
+    nrm_z12 = sqrtf(cml::blas_dot(d_hdl, &x12, &x12) + temp);
     global_z12_time = timer<double>() - global_z12_time;
     total_global_z12_time += global_z12_time;
     
     T eps_gap = std::sqrt(static_cast<T>(m + n)) * pogs_data->abs_tol +
-        pogs_data->rel_tol * z_nrm * z12_nrm;
-    T eps_pri = sqrtm_atol + pogs_data->rel_tol * z12_nrm;
-    T eps_dua = sqrtn_atol + pogs_data->rel_tol * rho * z_nrm;
+        pogs_data->rel_tol * nrm_z * nrm_z12;
+    T eps_pri = sqrtm_atol + pogs_data->rel_tol * nrm_z12;
+    T eps_dua = sqrtn_atol + pogs_data->rel_tol * rho * nrm_z;
 
     if (converged || k == pogs_data->max_iter)
       break;
