@@ -679,9 +679,8 @@ int Pogs(PogsData<T, M> *pogs_data) {
     total_prox_time += prox_time;
     
     // Compute dual variable.
-    T nrm_r = 0, nrm_s = 0, gap, nrm_z, nrm_z12, temp;
+    T nrm_r = 0, nrm_s = 0, gap, nrm_z, nrm_z12, temp, temp2;
     cml::blas_axpy(d_hdl, -kOne, &z12, &z);
-    cml::blas_axpy(d_hdl, -kOne, &x12, &xh);
     cml::blas_dot(d_hdl, &z, &z12, &gap);
     gap = std::abs(gap);
 
@@ -690,7 +689,10 @@ int Pogs(PogsData<T, M> *pogs_data) {
     nrm_z = cml::blas_dot(d_hdl, &y, &y);
     cudaDeviceSynchronize();
     mpiu::Allreduce(&nrm_z, &temp, 1, MPI_SUM, MPI_COMM_WORLD);
-    nrm_z = sqrtf(cml::blas_dot(d_hdl, &xh, &xh) + temp);
+    nrm_z = cml::blas_dot(d_hdl, &x, &x);
+    cudaDeviceSynchronize();
+    mpiu::Allreduce(&nrm_z, &temp2, 1, MPI_SUM, MPI_COMM_WORLD);
+    nrm_z = sqrtf(temp + temp2);
     global_z_time = timer<double>() - global_z_time;
     total_global_z_time += global_z_time;
 
