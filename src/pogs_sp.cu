@@ -217,9 +217,11 @@ int Pogs(PogsData<T, M> *pogs_data) {
     total_prox_time += prox_time;
 
     // Compute dual variable.
-    T nrm_r = 0, nrm_s = 0, gap;
+    T nrm_r = 0, nrm_s = 0, gap, nrm_z, nrm_z12;
     cml::blas_axpy(d_hdl, -kOne, &z12, &z);
     cml::blas_dot(d_hdl, &z, &z12, &gap);
+    nrm_z = cml::blas_nrm2(d_hdl, &z);
+    nrm_z12 = cml::blas_nrm2(d_hdl, &z12);
     gap = std::abs(gap);
     pogs_data->optval = FuncEval(f, y12.data, 1) + FuncEval(g, x12.data, 1);
     T eps_gap = std::sqrt(static_cast<T>(m + n)) * pogs_data->abs_tol +
