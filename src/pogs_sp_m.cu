@@ -869,11 +869,24 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
   cml::blas_scal(d_hdl, rho, &y);
 
+  {
+    thrust::device_vector<T> over_m(n_sub, m_nodes);
+    thrust::transform(g.begin(), g.end(),
+                      over_m.begin(), g.begin(),
+                      ApplyOp<T, thrust::multiplies<T> >
+                      (thrust::multiplies<T>()));
+  }
   pogs_data->optval = FuncEval(f, y12.data, 1);
   T topt;
   mpiu::Allreduce(&pogs_data->optval, &topt, 1, MPI_SUM, MPI_COMM_WORLD);
   pogs_data->optval = topt + FuncEval(g, x12.data, 1);
-  
+  {
+    thrust::device_vector<T> over_m(n_sub, m_nodes);
+    thrust::transform(g.begin(), g.end(),
+                      over_m.begin(), g.begin(),
+                      ApplyOp<T, thrust::divides<T> >
+                      (thrust::divides<T>()));
+  }
 
   // Copy results to output.
   // Collect x and y final values
