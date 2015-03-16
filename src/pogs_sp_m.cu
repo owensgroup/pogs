@@ -49,28 +49,28 @@ struct ApplyOp: thrust::binary_function<FunctionObj<T>, FunctionObj<T>, T> {
 template <typename T>
 void SendFunctionObj(FunctionObj<T> &fo, int node, MPI_Request *request) {
   MPI_Isend(&fo.h, 1, MPI_INT, node, 0, MPI_COMM_WORLD, request);
-  MPI_Isend(&fo.a, sizeof(T), MPI_BYTE, node, 0, MPI_COMM_WORLD, request);
-  MPI_Isend(&fo.b, sizeof(T), MPI_BYTE, node, 0, MPI_COMM_WORLD, request);
-  MPI_Isend(&fo.c, sizeof(T), MPI_BYTE, node, 0, MPI_COMM_WORLD, request);
-  MPI_Isend(&fo.d, sizeof(T), MPI_BYTE, node, 0, MPI_COMM_WORLD, request);
-  MPI_Isend(&fo.e, sizeof(T), MPI_BYTE, node, 0, MPI_COMM_WORLD, request);
+  MPI_Isend(&fo.a, sizeof(T), MPI_BYTE, node, 1, MPI_COMM_WORLD, request);
+  MPI_Isend(&fo.b, sizeof(T), MPI_BYTE, node, 2, MPI_COMM_WORLD, request);
+  MPI_Isend(&fo.c, sizeof(T), MPI_BYTE, node, 3, MPI_COMM_WORLD, request);
+  MPI_Isend(&fo.d, sizeof(T), MPI_BYTE, node, 4, MPI_COMM_WORLD, request);
+  MPI_Isend(&fo.e, sizeof(T), MPI_BYTE, node, 5, MPI_COMM_WORLD, request);
 }
 
 template <typename T>
 void RecvFunctionObj(std::vector<FunctionObj<T> > &fos) {
   Function h;
   T a, b, c, d, e;
-  MPI_Recv(&h, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
+  MPI_Recv(&h, 1, MPI_INT, 0, 0, MPI_COMM_WORLD,
            MPI_STATUS_IGNORE);
-  MPI_Recv(&a, sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
+  MPI_Recv(&a, sizeof(T), MPI_BYTE, 0, 1, MPI_COMM_WORLD,
            MPI_STATUS_IGNORE);
-  MPI_Recv(&b, sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
+  MPI_Recv(&b, sizeof(T), MPI_BYTE, 0, 2, MPI_COMM_WORLD,
            MPI_STATUS_IGNORE);
-  MPI_Recv(&c, sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
+  MPI_Recv(&c, sizeof(T), MPI_BYTE, 0, 3, MPI_COMM_WORLD,
            MPI_STATUS_IGNORE);
-  MPI_Recv(&d, sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
+  MPI_Recv(&d, sizeof(T), MPI_BYTE, 0, 4, MPI_COMM_WORLD,
            MPI_STATUS_IGNORE);
-  MPI_Recv(&e, sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG, MPI_COMM_WORLD,
+  MPI_Recv(&e, sizeof(T), MPI_BYTE, 0, 5, MPI_COMM_WORLD,
            MPI_STATUS_IGNORE);
 
   fos.push_back(FunctionObj<T>(h, a, b, c, d, e));
@@ -101,8 +101,9 @@ struct SendSubMatricesHelper<T, I, ROW> {
     int i_A = kRank / n_nodes; // Row, m
     int j_A = kRank % n_nodes; // Column, n
 
+    MPI_Request *request;
     if (kRank == 0) {
-      MPI_Request *request = new MPI_Request[kNodes];
+      request = new MPI_Request[kNodes];
       MPI_Status row_status;
       int curr_i_A = 0;
       int curr_j_A = 0;
@@ -134,6 +135,7 @@ struct SendSubMatricesHelper<T, I, ROW> {
                       0,
                       MPI_COMM_WORLD,
                       &request[node]);
+            MPI_Request_free(&request[node]);
             MPI_Isend(pogs_data->A.ind + stripe_begin,
                       (i - stripe_begin) * sizeof(I),
                       MPI_BYTE,
@@ -141,11 +143,12 @@ struct SendSubMatricesHelper<T, I, ROW> {
                       0,
                       MPI_COMM_WORLD,
                       &request[node]);
+            MPI_Request_free(&request[node]);
             stripe_begin = i;
           }
           row++;
         }
-      }
+        }
 
       node = 0;
       int f_increment = m_sub;
@@ -161,6 +164,7 @@ struct SendSubMatricesHelper<T, I, ROW> {
 
       for (; f_used < m; ++f_used) {
         SendFunctionObj(pogs_data->f[f_used], node, &request[node]);
+        MPI_Request_free(&request[node]);
       }
 
       node = 0;
@@ -170,14 +174,18 @@ struct SendSubMatricesHelper<T, I, ROW> {
       for (curr_j_A = 0; curr_j_A < m_nodes; ++curr_j_A) {
         for (int i = 0; i < g_size; ++i) {
           SendFunctionObj(pogs_data->g[i], node, &request[node]);
+          if (i != g_size - 1)
+            MPI_Request_free(&request[node]);
         }
+        //Printf("NODE 0 SEND G TO NODE %d\n", node);
 
         node++;
       }
-
+    if (kRank == 0) {
       // Wait on all nodes except master node
-      MPI_Waitall(kNodes - 1, request + 1, MPI_STATUSES_IGNORE);
+      //MPI_Waitall(kNodes - 1, request + 1, MPI_STATUSES_IGNORE);
       delete[] request;
+    }
     }
 
     T *val = A.val;
@@ -213,6 +221,8 @@ struct SendSubMatricesHelper<T, I, ROW> {
     }
     A.nnz = ptr[m_sub];
 
+    MPI_Barrier(MPI_COMM_WORLD);
+
     // Receive f proximal operators
     int num_f;
     if (j_A == m_nodes - 1) {
@@ -223,17 +233,24 @@ struct SendSubMatricesHelper<T, I, ROW> {
     std::vector<FunctionObj<T> > f;
     f.reserve(num_f);
     for (int i = 0; i < num_f; ++i) {
+      //Printf("node %d recv f %d\n", kRank, i);
       RecvFunctionObj(f);
+      //Printf("node %d recv f %d done\n", kRank, i);
     }
-    pogs_data->f = f;
 
     // Receive g operators
     int num_g = pogs_data->n;
     std::vector<FunctionObj<T> > g;
     g.reserve(num_g);
     for (int i = 0; i < num_g; ++i) {
+      //Printf("node %d recv g %d\n", kRank, i);
       RecvFunctionObj(g);
+      //Printf("node %d recv g %d done\n", kRank, i);
     }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    pogs_data->f = f;
     pogs_data->g = g;
   }
 };
@@ -338,7 +355,9 @@ struct SendSubMatricesHelper<T, I, COL> {
 
     // Receive A_ij matrix 
     ptr[0] = 0;
+    //Printf("node %d receiving %d stripes\n", kRank, n_sub);
     for (int stripes = 0; stripes < n_sub; ++stripes) {
+      //Printf("node %d receiving stripe val %d\n", kRank, stripes);
       MPI_Recv(val, m_sub * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
                MPI_COMM_WORLD,
                &col_status);
@@ -346,6 +365,7 @@ struct SendSubMatricesHelper<T, I, COL> {
       count /= sizeof(T);
       val += count;
 
+      //Printf("node %d receiving stripe ind %d\n", kRank, stripes);
       MPI_Recv(ind, m_sub * sizeof(I), MPI_BYTE, 0, MPI_ANY_TAG,
                MPI_COMM_WORLD,
                &col_status);
@@ -367,6 +387,7 @@ struct SendSubMatricesHelper<T, I, COL> {
     std::vector<FunctionObj<T> > g;
     g.reserve(num_g);
     for (int i = 0; i < num_g; ++i) {
+      //Printf("node %d recv g %d\n", kRank, i);
       RecvFunctionObj(g);
     }
     pogs_data->g = g;
@@ -381,6 +402,7 @@ struct SendSubMatricesHelper<T, I, COL> {
     std::vector<FunctionObj<T> > f;
     f.reserve(num_f);
     for (int i = 0; i < num_f; ++i) {
+      //Printf("node %d recv f %d\n", kRank, i);
       RecvFunctionObj(f);
     }
     pogs_data->f = f;
@@ -585,12 +607,11 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
   preprocess_time = timer<double>();
   if (pre_process && !err) {
-    cml::spmat_memcpy(s_hdl, &A, A_ij.val, A_ij.ind, A_ij.ptr);
-    cml::vector_set_all(&de, kOne);
-    //err = sinkhorn_knopp::Equilibrate(s_hdl, d_hdl, descr, &A, &d, &e, m, n,
-    //                                  i_A);
-
+    err = cml::spmat_memcpy(s_hdl, &A, A_ij.val, A_ij.ind, A_ij.ptr);
     if (!err) {
+      //cml::vector_set_all(&de, kOne);
+      err = sinkhorn_knopp::Equilibrate(s_hdl, d_hdl, descr, &A, &d, &e, m, n,
+                                        i_A);
       // TODO: Issue warning if x == NULL or y == NULL
       // Initialize x and y from x0 or/and y0
       if (pogs_data->init_x && !pogs_data->init_y && pogs_data->x) {
@@ -868,6 +889,9 @@ int Pogs(PogsData<T, M> *pogs_data) {
 
 
   cml::blas_scal(d_hdl, rho, &y);
+  cml::vector_div(&y12, &d_sub);
+  cml::vector_mul(&x12, &e);
+  cml::vector_mul(&y, &d_sub);
 
   {
     thrust::device_vector<T> over_m(n_sub, m_nodes);
@@ -876,17 +900,11 @@ int Pogs(PogsData<T, M> *pogs_data) {
                       ApplyOp<T, thrust::multiplies<T> >
                       (thrust::multiplies<T>()));
   }
+
   pogs_data->optval = FuncEval(f, y12.data, 1);
   T topt;
   mpiu::Allreduce(&pogs_data->optval, &topt, 1, MPI_SUM, MPI_COMM_WORLD);
   pogs_data->optval = topt + FuncEval(g, x12.data, 1);
-  {
-    thrust::device_vector<T> over_m(n_sub, m_nodes);
-    thrust::transform(g.begin(), g.end(),
-                      over_m.begin(), g.begin(),
-                      ApplyOp<T, thrust::divides<T> >
-                      (thrust::divides<T>()));
-  }
 
   // Copy results to output.
   // Collect x and y final values
@@ -903,7 +921,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
   MPI_Bcast(&pogs_data->y, sizeof(pogs_data->y), MPI_BYTE, 0, MPI_COMM_WORLD);
   if (pogs_data->y != 0 && !err) {
     if (m_sub == m) {
-      cml::vector_div(&y12, &d);
       if (kRank == 0)
         cml::vector_memcpy(pogs_data->y, &y12);
     } else {
@@ -918,7 +935,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
       mpiu::Gather(y12.data, y12.size, y12final.data, y12.size, 0,
                       MPI_COMM_WORLD);
       if (kRank == 0) {
-        cml::vector_div(&y12final, &d);
         cml::vector_memcpy(pogs_data->y, &y12final);
       }
 #endif
@@ -928,7 +944,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
   MPI_Bcast(&pogs_data->x, sizeof(pogs_data->x), MPI_BYTE, 0, MPI_COMM_WORLD);
   if (pogs_data->x != 0 && !err) {
     if (n_sub == n) {
-      cml::vector_mul(&x12, &e);
       if (kRank == 0)
         cml::vector_memcpy(pogs_data->x, &x12);
     } else {
@@ -943,7 +958,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
       mpiu::Gather(x12.data, x12.size, x12final.data, x12.size, 0,
                    MPI_COMM_WORLD);
       if (kRank == 0) {
-        cml::vector_mul(&x12final, &e);
         cml::vector_memcpy(pogs_data->x, &x12final);
       }
 #endif
@@ -953,7 +967,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
   MPI_Bcast(&pogs_data->l, sizeof(pogs_data->l), MPI_BYTE, 0, MPI_COMM_WORLD);
   if (pogs_data->l != 0 && !err) {
     if (m_sub == m) {
-      cml::vector_mul(&y, &d);
       if (kRank == 0)
         cml::vector_memcpy(pogs_data->l, &y);
     } else {
@@ -966,7 +979,6 @@ int Pogs(PogsData<T, M> *pogs_data) {
       cudaDeviceSynchronize();
       mpiu::Gather(y.data, y.size, yfinal.data, y.size, 0, MPI_COMM_WORLD);
       if (kRank == 0) {
-        cml::vector_mul(&yfinal, &d);
         cml::vector_memcpy(pogs_data->l, &yfinal);
       }
 #endif

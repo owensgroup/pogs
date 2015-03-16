@@ -97,13 +97,13 @@ void spmat_free(spmat<T, I, O> *A) {
 }
 
 template <typename T, typename I, CBLAS_ORDER O>
-void spmat_memcpy(cusparseHandle_t handle, spmat<T, I, O> *A,
-                  const T *val, const I *ind, const I *ptr) {
+cusparseStatus_t spmat_memcpy(cusparseHandle_t handle, spmat<T, I, O> *A,
+                              const T *val, const I *ind, const I *ptr) {
   cudaMemcpy(A->val, val, A->nnz * sizeof(T), cudaMemcpyHostToDevice);
   cudaMemcpy(A->ind, ind, A->nnz * sizeof(I), cudaMemcpyHostToDevice);
   cudaMemcpy(A->ptr, ptr, ptr_len(*A) * sizeof(I), cudaMemcpyHostToDevice);
-  MatTransp<O>(handle, A->m, A->n, A->nnz, A->val, A->ptr, A->ind,
-      A->val + A->nnz, A->ind + A->nnz, A->ptr + ptr_len(*A));
+  return MatTransp<O>(handle, A->m, A->n, A->nnz, A->val, A->ptr, A->ind,
+                      A->val + A->nnz, A->ind + A->nnz, A->ptr + ptr_len(*A));
 }
 
 }  // namespace
