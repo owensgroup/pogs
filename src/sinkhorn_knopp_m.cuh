@@ -156,7 +156,6 @@ T NormEst(cusparseHandle_t s_hdl, cublasHandle_t b_hdl,
     if (abs(nrm_est_last - nrm_est) < kTol * nrm_est)
       break;
   }
-  Printf("niter = %d, nrmest = %e\n", i, nrm_est);
 #ifdef POGS_OMPI_CUDA
   cml::matrix_free(&x_gather_buf);
   cml::vector_free(&identity);
