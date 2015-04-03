@@ -146,7 +146,7 @@ T NormEst(cusparseHandle_t s_hdl, cublasHandle_t b_hdl,
 
     T nrmx = cml::blas_nrm2(b_hdl, &x);
     // Calculate global nrmSx by collecting partial values from all nodes
-    T nrmSx = cml::blas_dot(b_hdl, &Sx, &Sx);
+    T nrmSx = cml::blas_dot(b_hdl, &Sx_sub, &Sx_sub);
     mpiu::Allreduce(static_cast<T*>(MPI_IN_PLACE), &nrmSx, 1, MPI_SUM,
       MPI_COMM_WORLD);
     nrmSx = sqrtf(nrmSx);
