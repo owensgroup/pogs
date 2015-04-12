@@ -92,6 +92,6 @@ double LpEq(int m_nodes, int m, int n, int nnz, int seed) {
   return ret;
 }
 
-template double LpEq<double>(int m_nodes, int m, int n, int nnz);
-template double LpEq<float>(int m_nodes, int m, int n, int nnz);
+template double LpEq<double>(int m_nodes, int m, int n, int nnz, int seed);
+template double LpEq<float>(int m_nodes, int m, int n, int nnz, int seed);
 

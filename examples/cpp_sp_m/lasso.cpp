@@ -77,6 +77,6 @@ double Lasso(int m_nodes, int m, int n, int nnz, int seed) {
   return ret;
 }
 
-template double Lasso<double>(int m_nodes, int m, int n, int nnz);
-template double Lasso<float>(int m_nodes, int m, int n, int nnz);
+template double Lasso<double>(int m_nodes, int m, int n, int nnz, int seed);
+template double Lasso<float>(int m_nodes, int m, int n, int nnz, int seed);
 

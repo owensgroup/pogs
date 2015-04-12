@@ -136,6 +136,6 @@ double LassoPath(int m_nodes, int m, int n, int nnz, int seed) {
   return timer<double>() - t;
 }
 
-template double LassoPath<double>(int m_nodes, int m, int n, int nnz);
-template double LassoPath<float>(int m_nodes, int m, int n, int nnz);
+template double LassoPath<double>(int m_nodes, int m, int n, int nnz, int seed);
+template double LassoPath<float>(int m_nodes, int m, int n, int nnz, int seed);
 
