@@ -293,6 +293,7 @@ int Equilibrate(cusparseHandle_t s_hdl, cublasHandle_t b_hdl,
         thrust::device_pointer_cast(d_sub.data + d_sub.size),
         thrust::device_pointer_cast(d_sub.data), ReciprF<T>(n));
     cudaDeviceSynchronize();
+
   }
 //  return 0;
 
@@ -339,7 +340,7 @@ int Equilibrate(cusparseHandle_t s_hdl, cublasHandle_t b_hdl,
   cml::vector<T> a_vec = cml::vector_view_array(A_ij->val, 2 * A_ij->nnz);
   cml::vector_scale(&a_vec, 1 / nrmA);
   cudaDeviceSynchronize();
-
+  
   cml::vector_scale(d, 1 / (scale * sqrt(nrmA)));
   cudaDeviceSynchronize();
   cml::vector_scale(e, scale / sqrt(nrmA));
