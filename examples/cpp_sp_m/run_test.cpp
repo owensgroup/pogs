@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
       if ( vm.count("help")  ) { 
         std::cout << "POGS test driver" << std::endl 
                   << desc << std::endl; 
-        return SUCCESS; 
+        return EXIT_SUCCESS; 
       } 
  
       po::notify(vm); // throws on error, so do after help in case 
