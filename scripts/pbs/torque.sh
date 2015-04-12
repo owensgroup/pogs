@@ -9,6 +9,7 @@
 
 test_file=$1
 
+module load boost/1.57
 module load cuda/6.5
 module load gcc/4.8.4
 module load hwloc/1.7.1

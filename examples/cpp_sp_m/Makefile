@@ -5,9 +5,12 @@ CUDAROOT=/usr/local/cuda-6.5
 # Example Files
 EXSRC=lasso.cpp lp_eq.cpp lasso_path.cpp # logistic.cpp lp_ineq.cpp nonneg_l2.cpp svm.cpp
 
+LD_BOOST=-I/home/abpoms/boost/boost_1_57_0
+LIB_BOOST=-L/home/abpoms/boost/boost_1_57_0/stage/lib -lboost_program_options
+
 # C++ Flags
 CXX=g++-4.8
-CXXFLAGS=-g -O3 -I$(POGSROOT) -std=c++11 -Wall -Wconversion  
+CXXFLAGS=-g -O3 $(LD_BOOST) -I$(POGSROOT) $(LIB_BOOST) -std=c++11 -Wall -Wconversion  
 
 # CUDA Flags
 CULDFLAGS_=-lcudart -lcublas -lcusparse -I$(CUDAROOT)/include
