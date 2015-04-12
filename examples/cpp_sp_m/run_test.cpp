@@ -100,6 +100,10 @@ int main(int argc, char **argv) {
   }
 
   MPI_Bcast(&pType, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&m, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&nnz, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&seed, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
   switch(pType) {
   case LASSO:
