@@ -96,18 +96,19 @@ def run_plan(plan, test_settings):
     global plan_results
 
     tprint('Starting test plan')
-    plan_results = defaultdict(lambda: defaultdict(list))
+    plan_results = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     for test_name, tests in plan.iteritems():
         settings = test_settings[test_name]
         typ = settings['type']
         trials = int(settings['trials'])
         tprint('Starting test', test_name)
-        for trial in range(trials):
-            seed = 1000 + trial
-            for param in settings['params']:
-                M = param['M']
-                N = param['N']
-                nnz = int(int(M) * int(N) * float(param['density']))
+        for param in settings['params']:
+            M = param['M']
+            N = param['N']
+            nnz = int(int(M) * int(N) * float(param['density']))
+            tprint('Starting trials')
+            for trial in range(trials):
+                seed = 1000 + trial
                 args = test_args_template.format(typ=typ, M=M, N=N, nnz=nnz,
                                                  seed=seed)
                 tprint('Starting tasks for args:', args)
@@ -138,9 +139,14 @@ def run_plan(plan, test_settings):
                             'out': sout,
                             'err': serr
                         }
-                    plan_results[test_name][task['name']].append(result)
+                    task_entry = plan_results[test_name][task['name']]
+                    task_entry[str(trial)].append(result)
+                    task_entry['M'] = M
+                    task_entry['N'] = N
+                    task_entry['nnz'] = nnz
+                    task_entry['cmd'] = cmd
                 tprint('Finished tasks')
-            tprint('Finished trial', trial)
+            tprint('Finished trials')
         tprint('Finished test')
     tprint('Finished test plan')
     return plan_results

@@ -11,7 +11,7 @@
 typedef double real_t;
 
 template<typename T>
-using ProblemFn = double (*)(int m_nodes, int m, int n, int nnz);
+using ProblemFn = double (*)(int m_nodes, int m, int n, int nnz, int seed);
 
 enum ProblemType {
   LASSO,
@@ -32,7 +32,7 @@ inline int parse_int_arg(const char *arg, const char *errmsg) {
 }
 
 template <typename T>
-double ErrorProblem(int, int, int, int) {
+double ErrorProblem(int, int, int, int, int) {
   std::cerr << "Problem type invalid" << std::endl;
   std::exit(EXIT_FAILURE);
   return 0.0;
@@ -41,7 +41,7 @@ double ErrorProblem(int, int, int, int) {
 int main(int argc, char **argv) {
   namespace po = boost::program_options;
 
-  int m_nodes, m, n, nnz;
+  int m_nodes, m, n, nnz, seed;
   std::string typ;
   int kRank;
   ProblemType pType;
@@ -64,7 +64,8 @@ int main(int argc, char **argv) {
        "Number of nodes to row split across") 
       ("m", po::value<int>(&m), "# of rows in generated matrix")
       ("n", po::value<int>(&n), "# of columns in generated matrix")
-      ("nnz", po::value<int>(&nnz), "# of nonzeros in generated matrix");
+      ("nnz", po::value<int>(&nnz), "# of nonzeros in generated matrix")
+      ("seed", po::value<int>(&seed), "seed");
  
     po::variables_map vm; 
     try { 
@@ -111,7 +112,7 @@ int main(int argc, char **argv) {
     break;
   }
 
-  double ret = problem(m_nodes, m, n, nnz);
+  double ret = problem(m_nodes, m, n, nnz, seed);
   if (ret != -1) {
       ret = 0;
   }

@@ -33,7 +33,7 @@ T Asum(std::vector<T> *v) {
 // for 50 values of \lambda.
 // See <pogs>/matlab/examples/lasso_path.m for detailed description.
 template <typename T>
-double LassoPath(int m_nodes, int m, int n, int nnz) {
+double LassoPath(int m_nodes, int m, int n, int nnz, int seed) {
   int kRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
   
@@ -54,8 +54,8 @@ double LassoPath(int m_nodes, int m, int n, int nnz) {
     b.resize(m);
 
     std::default_random_engine generator;
-    generator.seed(10);
-    srand(0);
+    generator.seed(seed);
+    srand(seed);
     std::normal_distribution<T> n_dist(static_cast<T>(0),
                                        static_cast<T>(1));
  

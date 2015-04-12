@@ -4,7 +4,7 @@
         {
             "name": "pogs_row_4",
             "directory": "~/repos/pogs/examples/cpp_sp_m/",
-            "run": "mpirun -q -np 4 ./run_test 4",
+            "run": "mpirun -q -np 4 ./run_test --m_nodes 4",
             "tests": ["lasso_mn"]
         },
     ],

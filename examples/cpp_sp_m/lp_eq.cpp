@@ -14,7 +14,7 @@
 //
 // See <pogs>/matlab/examples/lp_eq.m for detailed description.
 template <typename T>
-double LpEq(int m_nodes, int m, int n, int nnz) {
+double LpEq(int m_nodes, int m, int n, int nnz, int seed) {
   int kRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
 
@@ -25,8 +25,8 @@ double LpEq(int m_nodes, int m, int n, int nnz) {
   std::vector<T> y(m + 1);
 
   std::default_random_engine generator;
-  generator.seed(12410);
-  srand(1240);
+  generator.seed(seed);
+  srand(seed);
   std::uniform_real_distribution<T> u_dist(static_cast<T>(0),
                                            static_cast<T>(1));
 

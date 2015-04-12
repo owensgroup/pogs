@@ -12,7 +12,7 @@
 //
 // See <pogs>/matlab/examples/lasso.m for detailed description.
 template <typename T>
-double Lasso(int m_nodes, int m, int n, int nnz) {
+double Lasso(int m_nodes, int m, int n, int nnz, int seed) {
   int kRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
 
@@ -29,8 +29,8 @@ double Lasso(int m_nodes, int m, int n, int nnz) {
     b.resize(m);
 
     std::default_random_engine generator;
-    generator.seed(1240);
-    srand(12410);
+    generator.seed(seed);
+    srand(seed);
     std::normal_distribution<T> n_dist(static_cast<T>(0),
                                        static_cast<T>(1));
  
