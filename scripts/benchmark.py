@@ -14,7 +14,7 @@ import argparse
 cmd_args = None
 plan_results = None
 
-test_args_template = '{typ} {M} {N} {nnz}'
+test_args_template = '{typ} {M} {N} {nnz} {seed}'
 
 
 def tprint(*args, **kwargs):
@@ -100,41 +100,47 @@ def run_plan(plan, test_settings):
     for test_name, tests in plan.iteritems():
         settings = test_settings[test_name]
         typ = settings['type']
+        trials = int(settings['trials'])
         tprint('Starting test', test_name)
-        for param in settings['params']:
-            M = param['M']
-            N = param['N']
-            nnz = int(int(M) * int(N) * float(param['density']))
-            args = test_args_template.format(typ=typ, M=M, N=N, nnz=nnz)
-            tprint('Starting tasks for args:', args)
-            for task in tests:
-                cmd = task['run'] + ' ' + args
-                tprint('Running task with run cmd:', cmd)
-                p = subprocess.Popen(
-                    cmd,
-                    cwd=task['directory'],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    shell=True
-                )
-                tout = 60 * 60
-                try:
-                    sout, serr = p.communicate(timeout=tout)
-                except subprocess.TimeoutExpired:
-                    p.kill()
-                    tprint('Task timed out after', tout, 'seconds')
-                    sout, serr = p.communicate()
-                if p.returncode == 0:
-                    tprint('Finished task')
-                    result = parse_solver_output(sout, serr)
-                else:
-                    tprint('Error in task, return code:', str(p.returncode))
-                    result = {
-                        'out': sout,
-                        'err': serr
-                    }
-                plan_results[test_name][task['name']].append(result)
-            tprint('Finished tasks')
+        for trial in range(trials):
+            seed = 1000 + trial
+            for param in settings['params']:
+                M = param['M']
+                N = param['N']
+                nnz = int(int(M) * int(N) * float(param['density']))
+                args = test_args_template.format(typ=typ, M=M, N=N, nnz=nnz,
+                                                 seed=seed)
+                tprint('Starting tasks for args:', args)
+                for task in tests:
+                    cmd = task['run'] + ' ' + args
+                    tprint('Running task with run cmd:', cmd)
+                    p = subprocess.Popen(
+                        cmd,
+                        cwd=task['directory'],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        shell=True
+                    )
+                    tout = 60 * 60
+                    try:
+                        sout, serr = p.communicate(timeout=tout)
+                    except subprocess.TimeoutExpired:
+                        p.kill()
+                        tprint('Task timed out after', tout, 'seconds')
+                        sout, serr = p.communicate()
+                    if p.returncode == 0:
+                        tprint('Finished task')
+                        result = parse_solver_output(sout, serr)
+                    else:
+                        tprint('Error in task, return code:',
+                               str(p.returncode))
+                        result = {
+                            'out': sout,
+                            'err': serr
+                        }
+                    plan_results[test_name][task['name']].append(result)
+                tprint('Finished tasks')
+            tprint('Finished trial', trial)
         tprint('Finished test')
     tprint('Finished test plan')
     return plan_results
