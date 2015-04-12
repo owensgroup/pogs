@@ -5,7 +5,6 @@
 #PBS -e testjob.err
 #PBS -M abpoms@ucdavis.edu
 #PBS -m abe
-#PBS -l nodes=4:k40x4:ppn=4
 
 test_file=$1
 
