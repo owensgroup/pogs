@@ -9,25 +9,25 @@
         {
             "name": "pogs_row_2",
             "directory": "~/repos/pogs/examples/cpp_sp_m/",
-            "run": "mpirun --mca mpool_sm_min_size 10000000000 -q -np 2 ./run_test 2",
+            "run": "mpirun --mca mpool_sm_min_size 10000000000 -q -np 2 ./run_test --m_nodes 2",
             "tests": ["lasso_mn"]
         },
         {
             "name": "pogs_row_4",
             "directory": "~/repos/pogs/examples/cpp_sp_m/",
-            "run": "mpirun --mca mpool_sm_min_size 10000000000 -q -np 4 ./run_test 4",
+            "run": "mpirun --mca mpool_sm_min_size 10000000000 -q -np 4 ./run_test --m_nodes 4",
             "tests": ["lasso_mn"]
         },
         {
             "name": "pogs_row_8",
             "directory": "~/repos/pogs/examples/cpp_sp_m/",
-            "run": "mpirun --mca mpool_sm_min_size 10000000000 -q -np 8 ./run_test 8",
+            "run": "mpirun --mca mpool_sm_min_size 10000000000 -q -np 8 ./run_test --m_nodes 8",
             "tests": ["lasso_mn"]
         },
         {
             "name": "pogs_row_16",
             "directory": "~/repos/pogs/examples/cpp_sp_m/",
-            "run": "mpirun --mca mpool_sm_min_size 10000000000 -q -np 16 ./run_test 16",
+            "run": "mpirun --mca mpool_sm_min_size 10000000000 -q -np 16 ./run_test --m_nodes 16",
             "tests": ["lasso_mn"]
         }
     ],

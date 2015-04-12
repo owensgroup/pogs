@@ -14,7 +14,7 @@ import argparse
 cmd_args = None
 plan_results = None
 
-test_args_template = '{typ} {M} {N} {nnz} {seed}'
+test_args_template = '--type {typ} -m {M} -n {N} --nnz {nnz} --seed {seed}'
 
 
 def tprint(*args, **kwargs):

@@ -3,6 +3,7 @@
 #include <mpi.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include "boost/program_options.hpp"
 
 #include "examples.h"
 #include "util.h"
@@ -30,10 +31,6 @@ inline int parse_int_arg(const char *arg, const char *errmsg) {
   return out;
 }
 
-inline bool is_problem(const char *typ, const char *problem) {
-  return strcmp(typ, problem) == 0;
-}
-
 template <typename T>
 double ErrorProblem(int, int, int, int) {
   std::cerr << "Problem type invalid" << std::endl;
@@ -42,8 +39,10 @@ double ErrorProblem(int, int, int, int) {
 }
 
 int main(int argc, char **argv) {
+  namespace po = boost::program_options;
+
   int m_nodes, m, n, nnz;
-  char *typ;
+  std::string typ;
   int kRank;
   ProblemType pType;
   ProblemFn<real_t> problem;
@@ -57,20 +56,40 @@ int main(int argc, char **argv) {
   cudaSetDevice(0);
 
   MASTER(kRank) {
-    if (argc < 6) {
-      std::cout << "Not enough arguments" << std::endl;
-      std::exit(EXIT_FAILURE);
-    }
+    po::options_description desc("Options"); 
+    desc.add_options() 
+      ("help", "Print this help message") 
+      ("type", po::value<std::string>(&typ), "Type of problem to run")
+      ("m_nodes", po::value<int>(&m_nodes),
+       "Number of nodes to row split across") 
+      ("m", po::value<int>(&m), "# of rows in generated matrix")
+      ("n", po::value<int>(&n), "# of columns in generated matrix")
+      ("nnz", po::value<int>(&nnz), "# of nonzeros in generated matrix");
+ 
+    po::variables_map vm; 
+    try { 
+      po::store(po::parse_command_line(argc, argv, desc), vm); // can throw 
+ 
+      /** --help option 
+       */ 
+      if ( vm.count("help")  ) { 
+        std::cout << "POGS test driver" << std::endl 
+                  << desc << std::endl; 
+        return SUCCESS; 
+      } 
+ 
+      po::notify(vm); // throws on error, so do after help in case 
+                      // there are any problems 
+    } 
+    catch(po::error& e) { 
+      std::cerr << "ERROR: " << e.what() << std::endl << std::endl; 
+      std::cerr << desc << std::endl; 
+      exit(EXIT_FAILURE);
+    } 
 
-    typ = argv[2];
-    m_nodes = parse_int_arg(argv[1], "Can't convert m_nodes arg to int");
-    m = parse_int_arg(argv[3], "Can't convert m arg to int");
-    n = parse_int_arg(argv[4], "Can't convert n arg to int");
-    nnz = parse_int_arg(argv[5], "Can't convert nnz arg to int");
-
-    if (is_problem(typ, "lasso")) {
+    if (typ == "lasso") {
       pType = LASSO;
-    } else if (is_problem(typ, "lp")) {
+    } else if (typ == "lp") {
       pType = LP;
     } else {
       std::cout << "No problem of that type\n" << std::endl;
