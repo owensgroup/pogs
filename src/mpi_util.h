@@ -71,5 +71,25 @@ inline int Gather(double *send,
                     root, comm);
 };
 
+inline int Scatter(float *send,
+                  int send_count,
+                  float *recv,
+                  int recv_count,
+                  int root,
+                  MPI_Comm comm) {
+  return MPI_Scatter(send, send_count, MPI_FLOAT, recv, recv_count, MPI_FLOAT,
+                    root, comm);
+};
+
+inline int Scatter(double *send,
+                  int send_count,
+                  double *recv,
+                  int recv_count,
+                  int root,
+                  MPI_Comm comm) {
+  return MPI_Scatter(send, send_count, MPI_DOUBLE, recv, recv_count, MPI_DOUBLE,
+                    root, comm);
+};
+
 } // namespace mpiu
 #endif // MPI_UTIL_H
