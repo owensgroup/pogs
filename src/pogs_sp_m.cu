@@ -853,7 +853,7 @@ int Pogs(PogsData<T, M> *pogs_data) {
       &xh);
     cml::blas_scal(d_hdl, 1.0 / m_nodes, &xh);
   }
-#ifndef POGS_OMPI_CUD
+#ifndef POGS_OMPI_CUDA
     // NOT IMPLEMENTED
     1;
 #else
