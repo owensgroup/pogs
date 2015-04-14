@@ -837,19 +837,27 @@ int Pogs(PogsData<T, M> *pogs_data) {
     cml::vector_memcpy(&xhtmp, &x);
     cml::blas_axpy(d_hdl, -kOne, &xt, &xhtmp);
 #ifndef POGS_OMPI_CUDA
-    cudaMemcpy(xhtmp_h.data(), xhtmp.data, xhtmp.size,
-               cudaMemcpyDeviceToHost);
-    mpiu::Allreduce(xhtmp_h.data(), xh_h.data(), xh_h.size(), MPI_SUM,
-                    MPI_COMM_WORLD);
-    cudaMemcpy(xh.data, xh_h.data(), xh_h.size(), cudaMemcpyHostToDevice);
+    // cudaMemcpy(xhtmp_h.data(), xhtmp.data, xhtmp.size,
+    //            cudaMemcpyDeviceToHost);
+    // mpiu::Reduce(xhtmp_h.data(), xh_h.data(), xh_h.size(), MPI_SUM,
+    //                 MPI_COMM_WORLD);
+    // cudaMemcpy(xh.data, xh_h.data(), xh_h.size(), cudaMemcpyHostToDevice);
 #else
     cudaDeviceSynchronize();
-    mpiu::Allgather(xhtmp.data, xhtmp.size, gather_buf.data, xhtmp.size,
-                    MPI_COMM_WORLD);
-    cml::blas_gemv(d_hdl, CUBLAS_OP_T, kOne, &gather_buf, &identity, kZero,
-                   &xh);
+    mpiu::Gather(xhtmp.data, xhtmp.size, gather_buf.data, xhtmp.size, 0,
+                 MPI_COMM_WORLD);
 #endif
-    cml::blas_scal(d_hdl, 1.0 / m_nodes, &xh);
+    if (kRank == 0) {
+    cml::blas_gemv(d_hdl, CUBLAS_OP_T, kOne, &gather_buf, &identity, kZero,
+      &xhtmp);
+    cml::blas_scal(d_hdl, 1.0 / m_nodes, &xhtmp);
+  }
+#ifndef POGS_OMPI_CUDA
+    // NOT IMPLEMENTED
+#else
+    cudaDeviceSynchronize();
+    mpiu::Scatter(xhtmp.data, xhtmp.size, xh.data, xh.size, 0, MPI_COMM_WORLD);
+#endif
     avg_time = timer<double>() - avg_time;
     total_avg_time += avg_time;
 
