@@ -91,5 +91,19 @@ inline int Scatter(double *send,
                     root, comm);
 };
 
+inline int Bcast(double *send,
+                 int send_count,
+                 int root,
+                 MPI_Comm comm) {
+  return MPI_Bcast(send, send_count, MPI_DOUBLE, root, comm);
+};
+
+inline int Bcast(float *send,
+                  int send_count,
+                  int root,
+                  MPI_Comm comm) {
+  return MPI_Bcast(send, send_count, MPI_FLOAT, root, comm);
+};
+
 } // namespace mpiu
 #endif // MPI_UTIL_H
