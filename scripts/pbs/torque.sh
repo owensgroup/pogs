@@ -1,8 +1,5 @@
 #! /bin/bash
 #PBS -S /bin/bash
-#PBS -N testjob
-#PBS -o testjob.out
-#PBS -e testjob.err
 #PBS -M abpoms@ucdavis.edu
 #PBS -m abe
 

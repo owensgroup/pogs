@@ -1,172 +1,196 @@
-
 {
     "solvers": [
         {
             "name": "pogs_row_4",
             "directory": "~/repos/pogs/examples/cpp_sp_m/",
             "run": "mpirun -q -np 4 ./run_test --m_nodes 4",
-            "tests": ["lasso_mn"]
+            "tests": [
+                "lasso_mn_1",
+                "lasso_mn_2",
+                "lasso_mn_3",
+                "lasso_mn_4",
+                "lasso_mn_5"
+            ]
         }
     ],
     "tests": {
-        "lasso_mn": {
+        "lasso_mn_1": {
             "type": "lasso",
             "trials": "10",
             "params": [
                 {
                     "M": "2048",
                     "N": "16384",
-                    "density": "0.00001"
+                    "density": "0.1"
                 },
                 {
                     "M": "4096",
                     "N": "32768",
-                    "density": "0.00001"
+                    "density": "0.1"
                 },
                 {
                     "M": "8192",
                     "N": "65536",
-                    "density": "0.00001"
+                    "density": "0.1"
                 },
                 {
                     "M": "16384",
                     "N": "131072",
-                    "density": "0.00001"
+                    "density": "0.1"
                 },
                 {
                     "M": "32768",
                     "N": "262144",
-                    "density": "0.00001"
+                    "density": "0.1"
                 },
                 {
                     "M": "65536",
                     "N": "524288",
-                    "density": "0.00001"
-                },
-                
-
+                    "density": "0.1"
+                }
+            ]
+        },
+        "lasso_mn_2": {
+            "type": "lasso",
+            "trials": "10",
+            "params": [
                 {
                     "M": "2048",
                     "N": "16384",
-                    "density": "0.0001"
+                    "density": "0.2"
                 },
                 {
                     "M": "4096",
                     "N": "32768",
-                    "density": "0.0001"
+                    "density": "0.2"
                 },
                 {
                     "M": "8192",
                     "N": "65536",
-                    "density": "0.0001"
+                    "density": "0.2"
                 },
                 {
                     "M": "16384",
                     "N": "131072",
-                    "density": "0.0001"
+                    "density": "0.2"
                 },
                 {
                     "M": "32768",
                     "N": "262144",
-                    "density": "0.0001"
+                    "density": "0.2"
                 },
                 {
                     "M": "65536",
                     "N": "524288",
-                    "density": "0.0001"
-                },
-
+                    "density": "0.2"
+                }
+            ]
+        },
+        "lasso_mn_3": {
+            "type": "lasso",
+            "trials": "10",
+            "params": [
                 {
                     "M": "2048",
                     "N": "16384",
-                    "density": "0.001"
+                    "density": "0.3"
                 },
                 {
                     "M": "4096",
                     "N": "32768",
-                    "density": "0.001"
+                    "density": "0.3"
                 },
                 {
                     "M": "8192",
                     "N": "65536",
-                    "density": "0.001"
+                    "density": "0.3"
                 },
                 {
                     "M": "16384",
                     "N": "131072",
-                    "density": "0.001"
+                    "density": "0.3"
                 },
                 {
                     "M": "32768",
                     "N": "262144",
-                    "density": "0.001"
+                    "density": "0.3"
                 },
                 {
                     "M": "65536",
                     "N": "524288",
-                    "density": "0.001"
-                },
-
+                    "density": "0.3"
+                }
+            ]
+        },
+        "lasso_mn_4": {
+            "type": "lasso",
+            "trials": "10",
+            "params": [
                 {
                     "M": "2048",
                     "N": "16384",
-                    "density": "0.01"
+                    "density": "0.4"
                 },
                 {
                     "M": "4096",
                     "N": "32768",
-                    "density": "0.01"
+                    "density": "0.4"
                 },
                 {
                     "M": "8192",
                     "N": "65536",
-                    "density": "0.01"
+                    "density": "0.4"
                 },
                 {
                     "M": "16384",
                     "N": "131072",
-                    "density": "0.01"
+                    "density": "0.4"
                 },
                 {
                     "M": "32768",
                     "N": "262144",
-                    "density": "0.01"
+                    "density": "0.4"
                 },
                 {
                     "M": "65536",
                     "N": "524288",
-                    "density": "0.01"
-                },
-
+                    "density": "0.4"
+                }
+            ]
+        },
+        "lasso_mn_5": {
+            "type": "lasso",
+            "trials": "10",
+            "params": [
                 {
                     "M": "2048",
                     "N": "16384",
-                    "density": "0.1"
+                    "density": "0.5"
                 },
                 {
                     "M": "4096",
                     "N": "32768",
-                    "density": "0.1"
+                    "density": "0.5"
                 },
                 {
                     "M": "8192",
                     "N": "65536",
-                    "density": "0.1"
+                    "density": "0.5"
                 },
                 {
                     "M": "16384",
                     "N": "131072",
-                    "density": "0.1"
+                    "density": "0.5"
                 },
                 {
                     "M": "32768",
                     "N": "262144",
-                    "density": "0.1"
+                    "density": "0.5"
                 },
                 {
                     "M": "65536",
                     "N": "524288",
-                    "density": "0.1"
+                    "density": "0.5"
                 }
             ]
         }
