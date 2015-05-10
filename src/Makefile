@@ -13,6 +13,7 @@ CXXFLAGS=$(IFLAGS) -g -O3 -Wall -std=c++11 -fPIC #-DDEBUG # -Wconversion
 CUXX=nvcc
 CUFLAGS=$(IFLAGS) -arch=sm_20 -Xcompiler -fPIC #-DDEBUG
 
+# MPI Flags
 
 # POGS header files.
 POGS_HDR=\
@@ -74,10 +75,41 @@ GPU_PRJ_OBJ=\
 	$(OBJDIR)/gpu/projector/projector_direct_dense.o
 GPU_OBJ=$(OBJDIR)/gpu/pogs.o
 
+# Multi-GPU Specific headers and object fiels.
+MULTI_CML_HDR=\
+    include/matrix/matrix_dist.h \
+    include/matrix/matrix_dist_dense.h \
+	multi/include/cml/cblas.h \
+	multi/include/cml/cml_blas.cuh \
+	multi/include/cml/cml_defs.cuh \
+	multi/include/cml/cml_linalg.cuh \
+	multi/include/cml/cml_matrix.cuh \
+	multi/include/cml/cml_rand.cuh \
+	multi/include/cml/cml_spblas.cuh \
+	multi/include/cml/cml_spmat.cuh \
+	multi/include/cml/cml_utils.cuh \
+	multi/include/cml/cml_vector.cuh
+
+MULTI_HDR=\
+	multi/include/cgls.cuh \
+	multi/include/equil_helper.cuh \
+	multi/include/projector_helper.cuh
+MULTI_MTX_OBJ=\
+	$(OBJDIR)/multi/matrix/matrix_dist_dense.o
+#   $(OBJDIR)/multi/matrix/matrix_sparse.o
+MULTI_PRJ_OBJ=\
+	$(OBJDIR)/multi/projector/projector_direct_dense.o
+#   $(OBJDIR)/multi/projector/projector_cgls.o
+MULTI_OBJ=$(OBJDIR)/multi/pogs.o
 
 # Set vpath for build
-VPATH=cpu cpu/matrix cpu/projector gpu gpu/matrix gpu/projector
-
+ifeq (cpu,$(MAKECMDGOALS))
+	vpath % cpu:cpu/matrix:cpu/projector
+else ifeq (gpu,$(MAKECMDGOALS))
+	vpath % gpu:gpu/matrix:gpu/projector
+else ifeq (multi,$(MAKECMDGOALS))
+	vpath % multi:multi/matrix:multi/projector
+endif
 
 # Build all
 cpu: $(CPU_OBJ) $(CPU_MTX_OBJ) $(CPU_PRJ_OBJ)
@@ -86,6 +118,9 @@ cpu: $(CPU_OBJ) $(CPU_MTX_OBJ) $(CPU_PRJ_OBJ)
 gpu: $(OBJDIR)/pogs_link.o $(GPU_OBJ) $(GPU_MTX_OBJ) $(GPU_PRJ_OBJ)
 	ar cr $(OBJDIR)/pogs.a $^
 
+multi: $(OBJDIR)/pogs_multi_link.o $(MULTI_OBJ) \
+ $(MULTI_MTX_OBJ) $(MULTI_PRJ_OBJ)
+	ar cr $(OBJDIR)/pogs.a $^
 
 # Directories
 $(OBJDIR):
@@ -109,6 +144,16 @@ $(OBJDIR)/gpu/matrix: $(OBJDIR)/gpu
 	mkdir -p $@ 
 
 $(OBJDIR)/gpu/projector: $(OBJDIR)/gpu
+	mkdir -p $@ 
+
+# Directories Multi-GPU
+$(OBJDIR)/multi: $(OBJDIR)
+	mkdir -p $@ 
+
+$(OBJDIR)/multi/matrix: $(OBJDIR)/multi
+	mkdir -p $@ 
+
+$(OBJDIR)/multi/projector: $(OBJDIR)/multi
 	mkdir -p $@ 
 
 
@@ -141,6 +186,23 @@ $(OBJDIR)/gpu/projector/%.o: %.cu $(GPU_HDR) | $(OBJDIR)/gpu/projector
 $(OBJDIR)/gpu/%.o: %.cu $(GPU_HDR) | $(OBJDIR)/gpu
 	$(CUXX) -Iinclude -Igpu/include $< $(CUFLAGS) $(IFLAGS) -dc -o $@
 
+# POGS Multi-GPU objects
+$(OBJDIR)/pogs_multi_link.o: $(MULTI_OBJ) $(MULTI_MTX_OBJ) $(MULTI_PRJ_OBJ) \
+| $(OBJDIR)
+	$(CUXX) $(CUFLAGS) $^ -dlink -o $@
+
+$(OBJDIR)/multi/pogs.o: multi/pogs.cu $(POGS_HDR) $(MULTI_CML_HDR) \
+| $(OBJDIR)/multi
+	$(CUXX) -Iinclude -Imulti/include $< $(CUFLAGS) -dc -o $@
+
+$(OBJDIR)/multi/matrix/%.o: %.cu $(MULTI_HDR) | $(OBJDIR)/multi/matrix
+	$(CUXX) -Iinclude -Imulti/include $< $(CUFLAGS) $(IFLAGS) -dc -o $@
+
+$(OBJDIR)/multi/projector/%.o: %.cu $(MULTI_HDR) | $(OBJDIR)/multi/projector
+	$(CUXX) -Iinclude -Imulti/include $< $(CUFLAGS) $(IFLAGS) -dc -o $@
+
+$(OBJDIR)/multi/%.o: %.cu $(MULTI_HDR) | $(OBJDIR)/multi
+	$(CUXX) -Iinclude -Imulti/include $< $(CUFLAGS) $(IFLAGS) -dc -o $@
+
 clean:
 	rm -rf pogs.a build/ *.dSYM
-
