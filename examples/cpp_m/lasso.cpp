@@ -80,5 +80,5 @@ double Lasso(Schedule &s, size_t m, size_t n, int seed) {
   return timer<double>() - t;
 }
 
-template double Lasso<double>(size_t m, size_t n);
-template double Lasso<float>(size_t m, size_t n);
+template double Lasso<double>(Schedule &s, size_t m, size_t n, int seed);
+template double Lasso<float>(Schedule &s, size_t m, size_t n, int seed);

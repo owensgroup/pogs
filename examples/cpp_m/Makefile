@@ -1,6 +1,6 @@
 # User Vars
 POGSROOT=../../src
-CUDARoot=/usr/local/cuda-6.5
+CUDAROOT=/usr/local/cuda-6.5
 
 # Example Files
 EXSRC=lasso.cpp lasso_path.cpp logistic.cpp lp_eq.cpp lp_ineq.cpp nonneg_l2.cpp svm.cpp
@@ -14,6 +14,10 @@ CXXFLAGS=$(IFLAGS) -g -O3 $(LD_BOOST) -I$(POGSROOT)/include $(LIB_BOOST) -std=c+
 
 # CUDA Flags
 CULDFLAGS_=-lcudart -lcublas -lcusparse -I$(CUDAROOT)/include
+
+# MPI Flags
+MPI_CFLAGS = $(shell mpic++ --showme:compile)
+MPI_LFLAGS = $(shell mpic++ --showme:link)
 
 # Check System Args.
 UNAME = $(shell uname -s)
@@ -31,11 +35,10 @@ cpu: run_all.cpp examples.h $(EXSRC)
 	$(CXX) $(CXXFLAGS) -o run $(EXSRC) $<	$(POGSROOT)/build/pogs.a $(LDFLAGS)
 
 # GPU
-gpu: run_all.cpp examples.h $(EXSRC)
-	$(MAKE) gpu -C $(POGSROOT) IFLAGS=$(IFLAGS)
+gpu: run_test.cpp examples.h $(EXSRC)
+	$(MAKE) multi -C $(POGSROOT) IFLAGS=$(IFLAGS)
 	$(CXX) $(CXXFLAGS) -o run $(EXSRC) $<	$(POGSROOT)/build/pogs.a $(CULDFLAGS)
 
 clean:
 	rm -f *.o *~ *~ run
 	rm -rf *.dSYM
-
