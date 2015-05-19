@@ -144,6 +144,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
   cml::vector<T> ytemp = cml::vector_subvector(&ztemp, n, m);
   CUDA_CHECK_ERR();
 
+  std::cout << std::endl;
   // Scale f and g to account for diagonal scaling e and d.
   thrust::transform(f_gpu.begin(), f_gpu.end(),
       thrust::device_pointer_cast(d.data), f_gpu.begin(),

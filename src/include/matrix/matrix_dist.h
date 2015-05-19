@@ -3,6 +3,7 @@
 
 #include <mpi.h>
 #include <memory>
+#include <cuda_runtime.h>
 #include "schedule.h"
 
 namespace pogs {
@@ -30,7 +31,7 @@ class MatrixDist {
  public:
   MatrixDist(const Schedule &s, size_t m, size_t n)
     : _S(s), _meta(meta_init(s)), _m(m), _n(n), _info(0), _done_init(false)
-    {};
+    { cudaSetDevice(_meta.gpu_indicies[0]); };
 
   virtual ~MatrixDist() { };
 
@@ -51,7 +52,7 @@ class MatrixDist {
   size_t BlockRows() const { return _meta.block.Rows(); }
   size_t BlockCols() const { return _meta.block.Cols(); }
   bool IsInit() const { return _done_init; }
-  const Schedule& Schedule() const { return _S; }
+  const Schedule& GetSchedule() const { return _S; }
   const ProcessInfo& Meta() const { return _meta; }
 };
 

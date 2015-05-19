@@ -2,7 +2,6 @@
 #define MATRIX_MATRIX_DIST_DENSE_H_
 
 #include "matrix_dist.h"
-#include "schedule.h"
 
 namespace pogs {
 
@@ -46,4 +45,3 @@ class MatrixDistDense : public MatrixDist<T> {
 }  // namespace pogs
 
 #endif  // MATRIX_MATRIX_DIST_DENSE_H_
-

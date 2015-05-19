@@ -70,6 +70,7 @@ int ProjectorDirect<T, M>::Init() {
 
   const BlockMeta &block = _A.Meta().block;
   size_t min_dim = std::min(block.Rows(), block.Cols());
+  printf("min dim %d\n", min_dim);
 
   cudaMalloc(&(info->AA), min_dim * min_dim * sizeof(T));
   cudaMalloc(&(info->L), min_dim * min_dim * sizeof(T));

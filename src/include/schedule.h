@@ -1,5 +1,5 @@
-#ifndef SCHEDULE_H
-#define SCHEDULE_H
+#ifndef SCHEDULE_H_
+#define SCHEDULE_H_
 
 #include <vector>
 

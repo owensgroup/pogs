@@ -64,6 +64,8 @@ MatrixDistDense<T>::MatrixDistDense(const Schedule &s, char ord,
   ASSERT(ord == 'r' || ord == 'R' || ord == 'c' || ord == 'C');
   _ord = (ord == 'r' || ord == 'R') ? ROW : COL;
 
+  cudaSetDevice(MatrixDist<T>::_meta.gpu_indicies[0]);
+
   // Set GPU specific _info.
   GpuData<T> *info = new GpuData<T>(data);
   this->_info = reinterpret_cast<void*>(info);
@@ -250,7 +252,7 @@ int MatrixDistDense<T>::Equil(T *d, T *e) {
   }
 
   // Perform Sinkhorn-Knopp equilibration.
-  SinkhornKnopp(this, d, e);
+  SinkhornKnopp(hdl, this, d, e);
   cudaDeviceSynchronize();
 
   // Transform A = sign(A) .* sqrt(A) if 2-norm equilibration was performed,
@@ -311,7 +313,7 @@ int MatrixDistDense<T>::Equil(T *d, T *e) {
   cudaDeviceSynchronize();
 
   DEBUG_PRINTF("norm A = %e, normd = %e, norme = %e\n", normA,
-      cml::blas_nrm2(hdl, &d_vec), cml::blas_nrm2(hdl, &e_vec));
+      mpih::dist_blas_nrm2(hdl, &d_vec), mpih::dist_blas_nrm2(hdl, &e_vec));
 
   cudaFree(sign);
   CUDA_CHECK_ERR();
@@ -416,11 +418,17 @@ void DistributeBlocks(const Schedule &s,
         const BlockMeta &block = s.At(node).block;
         for (size_t row = block.row_begin; row < block.row_end; ++row) {
           size_t offset = row * n + block.column_begin;
-          size_t size = block.column_end - block.column_begin;
-          // MPI
-          MPI_Request_free(&request[node]);
-          MPI_Isend(orig_data + offset, size * sizeof(T), MPI_BYTE, node, 0,
-                    MPI_COMM_WORLD, &request[node]);
+          size_t size = block.Cols();
+          if (kRank == node) {
+            size_t gpu_offset = (row - block.row_begin) * block.Cols();
+            cudaMemcpy(gpu_data + offset, orig_data + offset, size * sizeof(T),
+                       cudaMemcpyDefault);
+          } else {
+            MPI_Isend(orig_data + offset, size * sizeof(T), MPI_BYTE, node, 0,
+                      MPI_COMM_WORLD, &request[node - 1]);
+            if (row != block.row_end - 1)
+              MPI_Request_free(&request[node - 1]);
+          }
         }
       }
     } else {
@@ -429,39 +437,45 @@ void DistributeBlocks(const Schedule &s,
         for (size_t col = block.column_begin; col < block.column_end; ++col) {
           size_t offset = col * m + block.row_begin;
           size_t size = block.row_end - block.row_begin;
-          // MPI
-          MPI_Request_free(&request[node]);
-          MPI_Isend(orig_data + offset, size * sizeof(T), MPI_BYTE, node, 0,
-                    MPI_COMM_WORLD, &request[node]);
+          if (kRank == node) {
+            size_t gpu_offset = (col - block.column_begin) * block.Rows();
+            cudaMemcpy(gpu_data + offset, orig_data + offset, size * sizeof(T),
+                       cudaMemcpyDefault);
+          } else {
+            MPI_Isend(orig_data + offset, size * sizeof(T), MPI_BYTE, node, 0,
+                      MPI_COMM_WORLD, &request[node - 1]);
+            if (col != block.column_end - 1)
+              MPI_Request_free(&request[node - 1]);
+          }
         }
+      }
+    }
+  } else {
+    const BlockMeta &block = s.At(kRank).block;
+
+    size_t rows = block.row_end - block.row_begin;
+    size_t columns = block.column_end - block.column_begin;
+    if (ord == MatrixDistDense<T>::ROW) {
+      for (size_t row = 0; row < rows; ++row) {
+        size_t offset = row * columns;
+        size_t size = columns;
+        // MPI
+        MPI_Recv(gpu_data + offset, size * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
+                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      }
+    } else {
+      for (size_t col = 0; col < columns; ++col) {
+        size_t offset = col * rows;
+        size_t size = rows;
+        // MPI
+        MPI_Recv(gpu_data + offset, size * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
+                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       }
     }
   }
 
-  const BlockMeta &block = s.At(kRank).block;
-
-  size_t rows = block.row_end - block.row_begin;
-  size_t columns = block.column_end - block.column_begin;
-  if (ord == MatrixDistDense<T>::ROW) {
-    for (size_t row = 0; row < rows; ++row) {
-      size_t offset = row * columns;
-      size_t size = columns;
-      // MPI
-      MPI_Recv(gpu_data + offset, size * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
-               MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    }
-  } else {
-    for (size_t col = 0; col < columns; ++col) {
-      size_t offset = col * rows;
-      size_t size = rows;
-      // MPI
-      MPI_Recv(gpu_data + offset, size * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
-               MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    }
-  }
-
   MASTER(kRank) {
-    MPI_Waitall(kNodes, request, MPI_STATUSES_IGNORE);
+    MPI_Waitall(kNodes - 1, request, MPI_STATUSES_IGNORE);
     delete [] request;
   }
 }

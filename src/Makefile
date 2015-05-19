@@ -4,16 +4,23 @@
 # Bulid directory
 OBJDIR=build
 
+# MPI Flags
+MPI_CFLAGS = #$(shell mpic++ --showme:compile)
+MPI_LFLAGS = #$(shell mpic++ --showme:link)
+
+MPI_ROOT=/home/abpoms/mvapich2-2.1
+MPI_CFLAGS=-I$(MPI_ROOT)/include 
+MPI_LFLAGS=-Xlinker -rpath -Xlinker $(MPI_ROOT)/lib -Xlinker \
+--enable-new-dtags -L$(MPI_ROOT)/lib -lmpi_cxx -lmpi
 
 # C++ Flags
 CXX=g++
-CXXFLAGS=$(IFLAGS) -g -O3 -Wall -std=c++11 -fPIC #-DDEBUG # -Wconversion
+CXXFLAGS=$(IFLAGS) -g -O3 -Wall -std=c++11 -fPIC $(MPI_CFLAGS) $(MPI_LFLAGS)#-DDEBUG # -Wconversion
 
 # CUDA Flags
 CUXX=nvcc
-CUFLAGS=$(IFLAGS) -arch=sm_20 -Xcompiler -fPIC #-DDEBUG
+CUFLAGS=$(IFLAGS) -arch=sm_20 -Xcompiler -fPIC $(MPI_CFLAGS) $(MPI_LFLAGS)#-DDEBUG
 
-# MPI Flags
 
 # POGS header files.
 POGS_HDR=\

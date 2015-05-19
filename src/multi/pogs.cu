@@ -78,6 +78,8 @@ int Pogs<T, M, P>::_Init() {
   size_t m_block = block.Rows();
   size_t n_block = block.Cols();
 
+  cudaSetDevice(_A.Meta().gpu_indicies[0]);
+
   cudaMalloc(&_de, (m_block + n_block) * sizeof(T));
   cudaMalloc(&_z, (m_block + n_block) * sizeof(T));
   cudaMalloc(&_zt, (m_block + n_block) * sizeof(T));
@@ -185,10 +187,11 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
   if (!_done_init)
     _Init();
 
+
   MPI_Datatype t_type = mpih::MPIDTypeFromT<T>();
 
   std::vector<FunctionObj<T> > local_f, local_g;
-  DistributeProximals(_A.Schedule(), f, g, local_f, local_g);
+  DistributeProximals(_A.GetSchedule(), f, g, local_f, local_g);
 
   // Extract values from pogs_data
   size_t m = _A.Rows();
@@ -236,7 +239,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
       thrust::device_pointer_cast(e.data), g_gpu.begin(),
       ApplyOp<T, thrust::multiplies<T> >(thrust::multiplies<T>()));
 
-  thrust::device_vector<T> over_m(n_block, _A.Schedule().MBlocks());
+  thrust::device_vector<T> over_m(n_block, _A.GetSchedule().MBlocks());
   thrust::transform(g_gpu.begin(), g_gpu.end(),
                     over_m.begin(), g_gpu.begin(),
                     ApplyOp<T, thrust::divides<T> >(thrust::divides<T>()));
@@ -319,6 +322,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     ProxEval(f_gpu, _rho, y.data, y12.data);
     CUDA_CHECK_ERR();
 
+
     // Compute gap, optval, and tolerances.
     cml::blas_axpy(hdl, -kOne, &z12, &z);
 
@@ -327,7 +331,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     eps_gap = sqrtmn_atol + _rel_tol * cml::blas_nrm2(hdl, &z) *
     cml::blas_nrm2(hdl, &z12); */
     eps_pri = sqrtm_atol + _rel_tol * mpih::dist_blas_nrm2(hdl, &y12);
-    eps_dua = _rho * (sqrtn_atol + _rel_tol * cml::blas_nrm2(hdl, &x));
+    eps_dua = _rho * (sqrtn_atol + _rel_tol * mpih::dist_blas_nrm2(hdl, &x));
     CUDA_CHECK_ERR();
 
     // Apply over relaxation.
@@ -367,7 +371,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
       _A.BlockMul('n', kOne, x12.data, -kOne, ytemp.data);
       cudaDeviceSynchronize();
       nrm_r = mpih::dist_blas_nrm2(hdl, &ytemp);
-      if (true || (nrm_r < eps_pri) || use_exact_stop) {
+      if ((nrm_r < eps_pri) || use_exact_stop) {
         cml::vector_memcpy(&ztemp, &z12);
         cml::blas_axpy(hdl, kOne, &zt, &ztemp);
         cml::blas_axpy(hdl, -kOne, &zprev, &ztemp);
@@ -385,9 +389,25 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     if (_verbose > 2 && k % 10  == 0 ||
         _verbose > 1 && k % 100 == 0 ||
         _verbose > 1 && converged) {
-      T optval = FuncEval(f_gpu, y12.data) + FuncEval(g_gpu, x12.data);
-      Printf("%5d : %.2e  %.2e  %.2e  %.2e  %.2e  %.2e % .2e\n",
-          k, nrm_r, eps_pri, nrm_s, eps_dua, gap, eps_gap, optval);
+      T optval = FuncEval(f_gpu, y12.data);
+      MPI_Allreduce(MPI_IN_PLACE, &optval, 1, t_type, MPI_SUM, MPI_COMM_WORLD);
+
+      // Unscale
+      thrust::transform(g_gpu.begin(), g_gpu.end(),
+                        over_m.begin(), g_gpu.begin(),
+                        ApplyOp<T, thrust::multiplies<T> >
+                        (thrust::multiplies<T>()));
+      optval = optval + FuncEval(g_gpu, x12.data);
+      T vf = FuncEval(g_gpu, x12.data);
+      // Rescale
+      thrust::transform(g_gpu.begin(), g_gpu.end(),
+                        over_m.begin(), g_gpu.begin(),
+                        ApplyOp<T, thrust::divides<T> >
+                        (thrust::divides<T>()));
+      if (kRank == 0) {
+        Printf("%5d : %.2e  %.2e  %.2e  %.2e  %.2e  %.2e % .2e\n",
+               k, nrm_r, eps_pri, nrm_s, eps_dua, gap, eps_gap, optval);
+      }
     }
 
     // Break if converged or there are nans
@@ -433,10 +453,13 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     // Perform average operation over x values
     cml::vector_memcpy(&x_avg, &x);
     cml::blas_axpy(hdl, -kOne, &xt, &x_avg);
-    MPI_Reduce(MPI_IN_PLACE, x_avg.data, x_avg.size, t_type, MPI_SUM, 0,
-               MPI_COMM_WORLD);
     MASTER(kRank) {
-      cml::blas_scal(hdl, 1.0 / _A.Schedule().MBlocks(), &x_avg);
+      MPI_Reduce(MPI_IN_PLACE, x_avg.data, x_avg.size, t_type, MPI_SUM, 0,
+               MPI_COMM_WORLD);
+      cml::blas_scal(hdl, 1.0 / _A.GetSchedule().MBlocks(), &x_avg);
+    } else {
+      MPI_Reduce(x_avg.data, x_avg.data, x_avg.size, t_type, MPI_SUM, 0,
+                 MPI_COMM_WORLD);
     }
     MPI_Bcast(x_avg.data, x_avg.size, t_type, 0, MPI_COMM_WORLD);
   }
@@ -460,10 +483,18 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     status = POGS_SUCCESS;
 
   // Print summary
-  if (_verbose > 0) {
+  if (_verbose > 0 && kRank == 0) {
     Printf(__HBAR__
         "Status: %s\n" 
         "Timing: Total = %3.2e s, Init = %3.2e s\n"
+        "Iter  : %u\n",
+        PogsStatusString(status).c_str(), timer<double>() - t0, time_init, k);
+    Printf(__HBAR__
+        "Error Metrics:\n"
+        "Pri: "
+        "|Ax - y|    / (abs_tol sqrt(m)     / rel_tol + |y|)          = %.2e\n"
+        "Dua: "
+        "|A'l + u|   / (abs_tol sqrt(n)     / rels, Init = %3.2e s\n"
         "Iter  : %u\n",
         PogsStatusString(status).c_str(), timer<double>() - t0, time_init, k);
     Printf(__HBAR__

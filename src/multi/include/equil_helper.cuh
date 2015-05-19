@@ -28,7 +28,7 @@ enum NormTypes { kNorm1, kNorm2, kNormFro };
 // TODO: Figure out a better value for this constant
 const double kSinkhornConst        = 1e-8;
 const double kNormEstTol           = 1e-3;
-const unsigned int kEquilIter      = 50u; 
+const unsigned int kEquilIter      = 50u;
 const unsigned int kNormEstMaxIter = 50u;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -120,12 +120,13 @@ T Norm2Est(cublasHandle_t hdl, const MatrixDist<T> *A) {
 
   const BlockMeta &block = A->Meta().block;
   MPI_Comm x_comm, Sx_comm;
-  MPI_Comm_split(MPI_COMM_WORLD, block.row, 0, &x_comm);
-  MPI_Comm_split(MPI_COMM_WORLD, block.column, 0, &Sx_comm);
+  MPI_Comm_split(MPI_COMM_WORLD, block.column, 0, &x_comm);
+  MPI_Comm_split(MPI_COMM_WORLD, block.row, 0, &Sx_comm);
 
   T norm_est = 0, norm_est_last;
   cml::vector<T> x = cml::vector_alloc<T>(block.Cols());
   cml::vector<T> Sx = cml::vector_alloc<T>(block.Rows());
+
   cml::rand(x.data, x.size);
   cudaDeviceSynchronize();
 
@@ -168,7 +169,7 @@ T Norm2Est(cublasHandle_t hdl, const MatrixDist<T> *A) {
 ///////////////////////// Modified Sinkhorn Knopp //////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 template <typename T>
-void SinkhornKnopp(const MatrixDist<T> *A, T *d, T *e) {
+void SinkhornKnopp(cublasHandle_t hdl, const MatrixDist<T> *A, T *d, T *e) {
   MPI_Datatype t_type = (is_same<T,double>::value ?
                          MPI_DOUBLE :
                          MPI_FLOAT);
@@ -190,7 +191,7 @@ void SinkhornKnopp(const MatrixDist<T> *A, T *d, T *e) {
     cudaDeviceSynchronize();
     CUDA_CHECK_ERR();
     MPI_Allreduce(MPI_IN_PLACE, e_vec.data, e_vec.size, t_type, MPI_SUM,
-                  row_comm);
+                  col_comm);
 
     cml::vector_add_constant(&e_vec,
         static_cast<T>(kSinkhornConst) * (A->Rows() + A->Cols()) / A->Rows());
@@ -202,11 +203,11 @@ void SinkhornKnopp(const MatrixDist<T> *A, T *d, T *e) {
     CUDA_CHECK_ERR();
 
     // d := 1 ./ (A' * e).
-    A->Mul('n', static_cast<T>(1.), e, static_cast<T>(0.), d);
+    A->BlockMul('n', static_cast<T>(1.), e, static_cast<T>(0.), d);
     cudaDeviceSynchronize();
     CUDA_CHECK_ERR();
     MPI_Allreduce(MPI_IN_PLACE, d_vec.data, d_vec.size, t_type, MPI_SUM,
-                  col_comm);
+                  row_comm);
 
     cml::vector_add_constant(&d_vec,
         static_cast<T>(kSinkhornConst) * (A->Rows() + A->Cols()) / A->Cols());
@@ -223,4 +224,3 @@ void SinkhornKnopp(const MatrixDist<T> *A, T *d, T *e) {
 }  // namespace pogs
 
 #endif  // EQUIL_HELPER_CUH_
-
