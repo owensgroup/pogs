@@ -3,26 +3,28 @@
 
 #include <cstdlib>
 
-template <typename T>
-double Lasso(size_t m, size_t n);
+#include "schedule.h"
 
 template <typename T>
-double LassoPath(size_t m, size_t n);
+double Lasso(pogs::Schedule &s, size_t m, size_t n, int seed);
 
 template <typename T>
-double Logistic(size_t m, size_t n);
+double LassoPath(pogs::Schedule &s, size_t m, size_t n, int seed);
 
 template <typename T>
-double LpEq(size_t m, size_t n);
+double Logistic(pogs::Schedule &s, size_t m, size_t n, int seed);
 
 template <typename T>
-double LpIneq(size_t m, size_t n);
+double LpEq(pogs::Schedule &s, size_t m, size_t n, int seed);
 
 template <typename T>
-double NonNegL2(size_t m, size_t n);
+double LpIneq(pogs::Schedule &s, size_t m, size_t n, int seed);
 
 template <typename T>
-double Svm(size_t m, size_t n);
+double NonNegL2(pogs::Schedule &s, size_t m, size_t n, int seed);
+
+template <typename T>
+double Svm(pogs::Schedule &s, size_t m, size_t n, int seed);
 
 #endif  // EXAMPLES_H_
 

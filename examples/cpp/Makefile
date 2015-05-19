@@ -15,10 +15,10 @@ CULDFLAGS_=-lcudart -lcublas -lcusparse
 UNAME = $(shell uname -s)
 ifeq ($(UNAME), Darwin)
 LDFLAGS=-lm -framework Accelerate
-CULDFLAGS=-L/usr/local/cuda/lib -L/usr/local/lib $(CULDFLAGS_)
+CULDFLAGS=-L/usr/local/cuda-6.5/lib -L/usr/local/lib $(CULDFLAGS_)
 else
 LDFLAGS=-lm -lopenblas
-CULDFLAGS=-L/usr/local/cuda/lib64 $(CULDFLAGS_)
+CULDFLAGS=-L/usr/local/cuda-6.5/lib64 $(CULDFLAGS_)
 endif
 
 # CPU

@@ -1,6 +1,10 @@
 #include <random>
 #include <vector>
+#include <cstdlib>
 
+#include <mpi.h>
+
+#include "schedule.h"
 #include "matrix/matrix_dist_dense.h"
 #include "pogs.h"
 #include "timer.h"
@@ -11,19 +15,25 @@
 //
 // See <pogs>/matlab/examples/lasso.m for detailed description.
 template <typename T>
-double Lasso(Schedule &s, size_t m, size_t n, int seed) {
+double Lasso(pogs::Schedule &s, size_t m, size_t n, int seed) {
   std::vector<T> A;
   std::vector<T> b;
+  T lambda_max;
+
+  int kRank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
 
   MASTER(kRank) {
     A.resize(m * n);
     b.resize(m);
 
-    std::default_random_engine generator;
+    printf("seed: %d\n", seed);
+    std::minstd_rand0 generator{seed};
     std::uniform_real_distribution<T> u_dist(static_cast<T>(0),
                                              static_cast<T>(1));
     std::normal_distribution<T> n_dist(static_cast<T>(0),
                                        static_cast<T>(1));
+
 
     for (unsigned int i = 0; i < m * n; ++i)
       A[i] = n_dist(generator);
@@ -46,7 +56,7 @@ double Lasso(Schedule &s, size_t m, size_t n, int seed) {
     for (unsigned int i = 0; i < m; ++i)
       b[i] += static_cast<T>(0.5) * n_dist(generator);
 
-    T lambda_max = static_cast<T>(0);
+    lambda_max = static_cast<T>(0);
 #ifdef _OPENMP
 #pragma omp parallel for reduction(max : lambda_max)
 #endif
@@ -59,7 +69,9 @@ double Lasso(Schedule &s, size_t m, size_t n, int seed) {
     }
   }
 
-  pogs::MatrixDistDense<T> A_('r', m, n, A.data());
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  pogs::MatrixDistDense<T> A_(s, 'r', m, n, A.data());
   pogs::PogsDirect<T, pogs::MatrixDistDense<T> > pogs_data(A_);
   std::vector<FunctionObj<T> > f;
   std::vector<FunctionObj<T> > g;
@@ -80,5 +92,5 @@ double Lasso(Schedule &s, size_t m, size_t n, int seed) {
   return timer<double>() - t;
 }
 
-template double Lasso<double>(Schedule &s, size_t m, size_t n, int seed);
-template double Lasso<float>(Schedule &s, size_t m, size_t n, int seed);
+template double Lasso<double>(pogs::Schedule &s, size_t m, size_t n, int seed);
+template double Lasso<float>(pogs::Schedule &s, size_t m, size_t n, int seed);

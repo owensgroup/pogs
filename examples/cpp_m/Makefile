@@ -10,14 +10,19 @@ LIB_BOOST=-L/home/abpoms/boost/boost_1_57_0/stage/lib -lboost_program_options
 
 # C++ Flags
 CXX=g++
-CXXFLAGS=$(IFLAGS) -g -O3 $(LD_BOOST) -I$(POGSROOT)/include $(LIB_BOOST) -std=c++11 -Wall -Wconversion
+CXXFLAGS=$(IFLAGS) -g -O3 -I$(POGSROOT)/include $(LIB_BOOST) -std=c++11 -Wall -Wconversion
 
 # CUDA Flags
-CULDFLAGS_=-lcudart -lcublas -lcusparse -I$(CUDAROOT)/include
+CULDFLAGS_=-lcudart -lcublas -lcusparse -I$(CUDAROOT)/include -I./include $(LD_BOOST)  $(LIB_BOOST)
 
 # MPI Flags
-MPI_CFLAGS = $(shell mpic++ --showme:compile)
-MPI_LFLAGS = $(shell mpic++ --showme:link)
+MPI_CFLAGS = #$(shell mpic++ --showme:compile)
+MPI_LFLAGS = #$(shell mpic++ --showme:link)
+
+MPI_ROOT=/home/abpoms/mvapich2-2.1
+MPI_CFLAGS=-I$(MPI_ROOT)/include 
+MPI_LFLAGS=-Xlinker -rpath -Xlinker $(MPI_ROOT)/lib -Xlinker \
+--enable-new-dtags -L$(MPI_ROOT)/lib -lmpi_cxx -lmpi
 
 # Check System Args.
 UNAME = $(shell uname -s)
@@ -37,7 +42,7 @@ cpu: run_all.cpp examples.h $(EXSRC)
 # GPU
 gpu: run_test.cpp examples.h $(EXSRC)
 	$(MAKE) multi -C $(POGSROOT) IFLAGS=$(IFLAGS)
-	$(CXX) $(CXXFLAGS) -o run $(EXSRC) $<	$(POGSROOT)/build/pogs.a $(CULDFLAGS)
+	$(CXX) $(CXXFLAGS) $(MPI_CFLAGS) -o run $(EXSRC) $< $(POGSROOT)/build/pogs.a $(CULDFLAGS) $(MPI_LFLAGS)
 
 clean:
 	rm -f *.o *~ *~ run

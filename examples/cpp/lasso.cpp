@@ -1,5 +1,6 @@
 #include <random>
 #include <vector>
+#include <cstdlib>
 
 #include "matrix/matrix_dense.h"
 #include "pogs.h"
@@ -10,15 +11,17 @@
 //
 // See <pogs>/matlab/examples/lasso.m for detailed description.
 template <typename T>
-double Lasso(size_t m, size_t n) {
+double Lasso(size_t m, size_t n, int seed) {
   std::vector<T> A(m * n);
   std::vector<T> b(m);
 
-  std::default_random_engine generator;
+  printf("seed: %d\n", seed);
+  std::minstd_rand0 generator{seed};
   std::uniform_real_distribution<T> u_dist(static_cast<T>(0),
                                            static_cast<T>(1));
   std::normal_distribution<T> n_dist(static_cast<T>(0),
                                      static_cast<T>(1));
+
 
   for (unsigned int i = 0; i < m * n; ++i)
     A[i] = n_dist(generator);
@@ -70,6 +73,6 @@ double Lasso(size_t m, size_t n) {
   return timer<double>() - t;
 }
 
-template double Lasso<double>(size_t m, size_t n);
-template double Lasso<float>(size_t m, size_t n);
+template double Lasso<double>(size_t m, size_t n, int seed);
+template double Lasso<float>(size_t m, size_t n, int seed);
 

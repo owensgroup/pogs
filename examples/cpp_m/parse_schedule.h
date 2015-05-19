@@ -2,15 +2,21 @@
 #define PARSE_SCHEDULE_H_
 
 #include "schedule.h"
+#include <cstdio>
+#include <mpi.h>
 
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
 
 using namespace rapidjson;
+using namespace pogs;
 
 Schedule parse_schedule(const char* json_schedule,
                         const size_t m, const size_t n) {
+  int kRank;
+
+  MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
   int m_blocks, n_blocks;
   size_t m_per, n_per;
   std::vector<ProcessInfo> info;
@@ -39,7 +45,7 @@ Schedule parse_schedule(const char* json_schedule,
     proc.block.column_begin = n_per * proc.block.column;
     proc.block.column_end = n_per * (proc.block.column + 1);
 
-    const Value& gpus = a["gpu_indicies"];
+    const Value& gpus = a[i]["gpu_indicies"];
     for (SizeType i = 0; i < gpus.Size(); ++i) {
       proc.gpu_indicies.push_back(gpus[i].GetInt());
     }

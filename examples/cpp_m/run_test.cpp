@@ -1,3 +1,7 @@
+#include <iostream>
+#include <fstream>
+#include <streambuf>
+
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
@@ -13,7 +17,7 @@
 typedef double real_t;
 
 template<typename T>
-using ProblemFn = double (*)(Schedule &s, int m, int n, int seed);
+using ProblemFn = double (*)(Schedule &s, size_t m, size_t n, int seed);
 
 enum ProblemType {
   LASSO,
@@ -39,7 +43,7 @@ inline int parse_int_arg(const char *arg, const char *errmsg) {
 }
 
 template <typename T>
-double ErrorProblem(int, int, int, int, int) {
+double ErrorProblem(Schedule&, size_t, size_t, int) {
   std::cerr << "Problem type invalid" << std::endl;
   std::exit(EXIT_FAILURE);
   return 0.0;
@@ -51,11 +55,11 @@ int main(int argc, char **argv) {
   int m, n, seed;
   std::string typ;
   std::string schedule_file;
+  std::string sched_string;
 
   int kRank;
   ProblemType pType;
   ProblemFn<real_t> problem;
-  Schedule sched;
 
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
@@ -115,15 +119,30 @@ int main(int argc, char **argv) {
       std::cout << "No problem of that type\n" << std::endl;
       std::exit(EXIT_FAILURE);
     }
-
-    sched = parse_schedule(m, n, schedule_file.data());
+    std::ifstream sched_fs (schedule_file, std::fstream::in);
+    sched_string = std::string((std::istreambuf_iterator<char>(sched_fs)),
+                               std::istreambuf_iterator<char>());
   }
 
   MPI_Bcast(&pType, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast(&m, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast(&seed, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(&sched, sizeof(Schedule), MPI_BYTE, 0, MPI_COMM_WORLD);
+
+  size_t sched_size = sched_string.size();
+  MPI_Bcast(&sched_size, sizeof(size_t), MPI_BYTE, 0, MPI_COMM_WORLD);
+  char *buf = new char[sched_size + 1];
+  MASTER(kRank) {
+    memcpy(buf, sched_string.data(), sched_size*sizeof(char));
+  }
+  sched_string.resize(sched_size);
+  MPI_Bcast(buf, sched_size * sizeof(char), MPI_BYTE, 0, MPI_COMM_WORLD);
+  buf[sched_size] = '\0';
+  sched_string.resize(sched_size);
+  sched_string.replace(0, std::string::npos, buf);
+  delete [] buf;
+
+  Schedule sched = parse_schedule(sched_string.data(), m, n);
 
   switch(pType) {
   case LASSO:
