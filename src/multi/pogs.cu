@@ -533,7 +533,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
 
       TestPrintT("final_optval", _optval);
       TestPrintT("total_time", total);
-      printf("iterations %c %d\n", test_sep, k);
+      printf("BMARK iterations %c %d\n", test_sep, k);
     }
   }
 
