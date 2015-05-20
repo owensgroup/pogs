@@ -292,16 +292,18 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
   double time_init = timer<double>() - t0;
 
   // Signal start of execution.
-  if (_verbose > 0) {
-    Printf(__HBAR__
-        "           POGS v%s - Proximal Graph Solver                      \n"
-        "           (c) Christopher Fougner, Stanford University 2014-2015\n",
-        POGS_VERSION.c_str());
-  }
-  if (_verbose > 1) {
-    Printf(__HBAR__
-        " Iter | pri res | pri tol | dua res | dua tol |   gap   | eps gap |"
-        " pri obj\n" __HBAR__);
+  MASTER(kRank) {
+    if (_verbose > 0) {
+      Printf(__HBAR__
+             "           POGS v%s - Proximal Graph Solver                      \n"
+             "           (c) Christopher Fougner, Stanford University 2014-2015\n",
+             POGS_VERSION.c_str());
+    }
+    if (_verbose > 1) {
+      Printf(__HBAR__
+             " Iter | pri res | pri tol | dua res | dua tol |   gap   | eps gap |"
+             " pri obj\n" __HBAR__);
+    }
   }
 
   // Initialize scalars.
@@ -483,30 +485,32 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     status = POGS_SUCCESS;
 
   // Print summary
-  if (_verbose > 0 && kRank == 0) {
-    Printf(__HBAR__
-        "Status: %s\n" 
-        "Timing: Total = %3.2e s, Init = %3.2e s\n"
-        "Iter  : %u\n",
-        PogsStatusString(status).c_str(), timer<double>() - t0, time_init, k);
-    Printf(__HBAR__
-        "Error Metrics:\n"
-        "Pri: "
-        "|Ax - y|    / (abs_tol sqrt(m)     / rel_tol + |y|)          = %.2e\n"
-        "Dua: "
-        "|A'l + u|   / (abs_tol sqrt(n)     / rels, Init = %3.2e s\n"
-        "Iter  : %u\n",
-        PogsStatusString(status).c_str(), timer<double>() - t0, time_init, k);
-    Printf(__HBAR__
-        "Error Metrics:\n"
-        "Pri: "
-        "|Ax - y|    / (abs_tol sqrt(m)     / rel_tol + |y|)          = %.2e\n"
-        "Dua: "
-        "|A'l + u|   / (abs_tol sqrt(n)     / rel_tol + |u|)          = %.2e\n"
-        "Gap: "
-        "|x'u + y'l| / (abs_tol sqrt(m + n) / rel_tol + |x,u| |y,l|)  = %.2e\n"
-        __HBAR__, _rel_tol * nrm_r / eps_pri, _rel_tol * nrm_s / eps_dua,
-        _rel_tol * gap / eps_gap);
+  MASTER(kRank) {
+    if (_verbose > 0) {
+      Printf(__HBAR__
+             "Status: %s\n"
+             "Timing: Total = %3.2e s, Init = %3.2e s\n"
+             "Iter  : %u\n",
+             PogsStatusString(status).c_str(), timer<double>() - t0, time_init, k);
+      Printf(__HBAR__
+             "Error Metrics:\n"
+             "Pri: "
+             "|Ax - y|    / (abs_tol sqrt(m)     / rel_tol + |y|)          = %.2e\n"
+             "Dua: "
+             "|A'l + u|   / (abs_tol sqrt(n)     / rels, Init = %3.2e s\n"
+             "Iter  : %u\n",
+             PogsStatusString(status).c_str(), timer<double>() - t0, time_init, k);
+      Printf(__HBAR__
+             "Error Metrics:\n"
+             "Pri: "
+             "|Ax - y|    / (abs_tol sqrt(m)     / rel_tol + |y|)          = %.2e\n"
+             "Dua: "
+             "|A'l + u|   / (abs_tol sqrt(n)     / rel_tol + |u|)          = %.2e\n"
+             "Gap: "
+             "|x'u + y'l| / (abs_tol sqrt(m + n) / rel_tol + |x,u| |y,l|)  = %.2e\n"
+             __HBAR__, _rel_tol * nrm_r / eps_pri, _rel_tol * nrm_s / eps_dua,
+             _rel_tol * gap / eps_gap);
+    }
   }
 
   // Scale x, y, lambda and mu for output.
