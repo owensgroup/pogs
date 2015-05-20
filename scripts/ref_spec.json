@@ -1,0 +1,82 @@
+{
+    "solvers": [
+        "multi_dense" : {
+            "arg_template":
+            "--seed {seed} --type {typ} -m {m} -n {N}",
+            "directory": "~/repos/pogs/examples/cpp_m/"
+        },
+        "multi_sparse" : {
+            "arg_template":
+            "--seed {seed} --type {typ} -m {m} -n {N} --nnz {nnz}",
+            "directory": "~/repos/pogs/examples/cpp_sp_m/"
+        },
+        "single_dense" : {
+            "arg_template":
+            "--seed {seed} --type {typ} -m {m} -n {N}",
+            "directory": "~/repos/pogs/examples/cpp/"
+        },
+        "single_sparse" : {
+            "arg_template":
+            "--seed {seed} --type {typ} -m {m} -n {N} --nnz {nnz}",
+            "directory": "~/repos/pogs/examples/cpp_sp/"
+        }
+    ]
+    "configs": [
+        {
+            "name": "single_d",
+            "solver": "single_dense",
+            "run": "./run_test"
+        },
+        {
+            "name": "row_2_d",
+            "solver": "multi_dense",
+            "run": "mpirun -q -np 2 ./run_test --schedule schedule_gpu2.json"
+        },
+        {
+            "name": "row_4_d",
+            "solver": "multi_dense",
+            "run": "mpirun -q -np 4 ./run_test --schedule schedule_gpu4.json"
+        },
+        {
+            "name": "row_8_d",
+            "solver": "multi_dense",
+            "run": "mpirun -q -np 8 ./run_test --schedule schedule_gpu8.json"
+        }
+        {
+            "name": "row_16_d",
+            "solver": "multi_dense",
+            "run": "mpirun -q -np 16 ./run_test --schedule schedule_gpu16.json"
+        },
+        {
+            "name": "row_32_d",
+            "solver": "multi_dense",
+            "run": "mpirun -q -np 32 ./run_test --schedule schedule_gpu32.json"
+        }
+    ],
+    "tests": {
+        "lasso_mn_d_1": {
+            "type": "lasso",
+            "params": [
+                {"M": "1024", "N": "8192"},
+                {"M": "2048", "N": "16384"}
+                {"M": "4096", "N": "32768"},
+                {"M": "8192", "N": "65536"},
+                {"M": "16384", "N": "131072"},
+                {"M": "32768", "N": "262144"},
+                {"M": "65536", "N": "524288"},
+            ]
+        },
+        "lp_mn_d_1": {
+            "type": "lp",
+            "params": [
+                {"N": "1024", "M": "8192"},
+                {"N": "2048", "M": "16384"},
+                {"N": "4096", "M": "32768"},
+                {"N": "8192", "M": "65536"},
+                {"N": "16384", "M": "131072"},
+                {"N": "32768", "M": "262144"},
+                {"N": "65536", "M": "524288"}
+            ]
+        }
+    }
+}
