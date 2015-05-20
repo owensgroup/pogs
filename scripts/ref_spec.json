@@ -20,7 +20,7 @@
             "--seed {seed} --type {typ} -m {m} -n {N} --nnz {nnz}",
             "directory": "~/repos/pogs/examples/cpp_sp/"
         }
-    }
+    },
     "configs": {
         "single_d" : {
             "solver": "single_dense",
