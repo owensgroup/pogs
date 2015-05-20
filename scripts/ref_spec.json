@@ -2,17 +2,17 @@
     "solvers": {
         "multi_dense" : {
             "arg_template":
-            "--seed {seed} --type {typ} -m {m} -n {N}",
+            "--seed {seed} --type {typ} -m {m} -n {n}",
             "directory": "~/repos/pogs/examples/cpp_m/"
         },
         "single_dense" : {
             "arg_template":
-            "--seed {seed} --type {typ} -m {m} -n {N}",
+            "--seed {seed} --type {typ} -m {m} -n {n}",
             "directory": "~/repos/pogs/examples/cpp/"
         },
         "single_sparse" : {
             "arg_template":
-            "--seed {seed} --type {typ} -m {m} -n {N} --nnz {nnz}",
+            "--seed {seed} --type {typ} -m {m} -n {n} --nnz {nnz}",
             "directory": "~/repos/pogs/examples/cpp_sp/"
         }
     },
