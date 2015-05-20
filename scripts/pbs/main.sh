@@ -14,5 +14,6 @@ test_config=(
 
 for ((i=0;i<${#test_args[@]};++i)); do
     test=${test_args[i]}
-    qsub -F "${out_files[i]} $test" -N $test -o ${test}.out -e ${test}.err ${test_config[i]} torque.sh
+    out=${out_files[i]}
+    qsub -F "${out_files[i]} $test" -N $out -o ${out}.out -e ${out}.err ${test_config[i]} torque.sh
 done
