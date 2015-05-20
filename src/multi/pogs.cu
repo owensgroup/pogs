@@ -29,6 +29,24 @@ namespace pogs {
 
 namespace {
 
+// Printing for benchmarking purposes
+char test_sep = ':';
+
+template <typename T>
+inline void TestPrintT(const char *name, T value) {
+  printf("%s %c %.3e\n", name, test_sep, value);
+}
+
+template <typename T>
+inline void TestIterPrintT(unsigned int iter, const char *name, T value) {
+  printf("iter, %d, %s %c %.3e\n", iter, name, test_sep, value);
+}
+
+template <typename T>
+inline void TestIterPrintF(unsigned int iter, const char *name, T value) {
+  printf("iter, %d, %s %c %.3f\n", iter, name, test_sep, value);
+}
+
 template <typename T, typename Op>
 struct ApplyOp: thrust::binary_function<FunctionObj<T>, FunctionObj<T>, T> {
   Op binary_op;
@@ -487,6 +505,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
   // Print summary
   MASTER(kRank) {
     if (_verbose > 0) {
+      double total = timer<double>() - t0;
       Printf(__HBAR__
              "Status: %s\n"
              "Timing: Total = %3.2e s, Init = %3.2e s\n"
@@ -510,6 +529,10 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
              "|x'u + y'l| / (abs_tol sqrt(m + n) / rel_tol + |x,u| |y,l|)  = %.2e\n"
              __HBAR__, _rel_tol * nrm_r / eps_pri, _rel_tol * nrm_s / eps_dua,
              _rel_tol * gap / eps_gap);
+
+      TestPrintT("final_optval", _optval);
+      TestPrintT("total_time", total);
+      printf("iterations %c %d\n", test_sep, k);
     }
   }
 
