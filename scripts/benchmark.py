@@ -30,25 +30,26 @@ def parse_config_spec(file):
     spec = json.load(file)
     if not isinstance(spec, dict):
         return 'Config root must be an object'
-    for solver in spec['solvers']:
+    for solver_name, solver in spec['solvers'].iteritems():
         solver['directory'] = os.path.expanduser(solver['directory'])
     return spec
 
 
 def process_config_spec(spec):
-    plan = defaultdict(list)
-    # Process solvers
-    for solver in spec['solvers']:
-        task = {
-            'name': solver['name'],
-            'run': solver['run'],
-            'directory': solver['directory'],
-        }
-        for test in solver['tests']:
-            plan[test].append(task)
-    # Process configs
-    # Process tests
-    return plan
+    # plan = defaultdict(list)
+    # # Process solvers
+    # for solver in spec['solvers']:
+    #     task = {
+    #         'name': solver['name'],
+    #         'run': solver['run'],
+    #         'directory': solver['directory'],
+    #     }
+    #     for test in solver['tests']:
+    #         plan[test].append(task)
+    # # Process configs
+    # # Process tests
+    # return plan
+    return spec
 
 
 def parse_plan_spec(plan_file):
@@ -65,7 +66,7 @@ def parse_plan_arg(plan_arg):
     return plan_spec
 
 
-def process_plan_spec(plan_spec):
+def process_plan_spec(plan_spec, config):
     return plan_spec
     pass
 
@@ -119,6 +120,8 @@ def run_plan(plan, config):
             test_info = tests[test_name]
             tprint('Starting test', test_name)
             for param in test_info['params']:
+                param['seed'] = 1000
+                param['typ'] = test_info['type']
                 args = config_solver['arg_template'].format(**param)
                 cmd = config_info['run'] + ' ' + args
                 tprint('Running task with run cmd:', cmd)
@@ -136,16 +139,16 @@ def run_plan(plan, config):
                     p.kill()
                     tprint('Task timed out after', tout, 'seconds')
                     sout, serr = p.communicate()
-                    if p.returncode == 0:
-                        tprint('Finished task')
-                        result = parse_solver_output(sout, serr)
-                    else:
-                        tprint('Error in task, return code:',
-                               str(p.returncode))
-                        result = {
-                            'out': sout,
-                            'err': serr
-                        }
+                if p.returncode == 0:
+                    tprint('Finished task')
+                    result = parse_solver_output(sout, serr)
+                else:
+                    tprint('Error in task, return code:',
+                           str(p.returncode))
+                    result = {
+                        'out': sout,
+                        'err': serr
+                    }
                 plan_results[config_name][test_name].append(result)
                 tprint('Finished tasks')
             tprint('Finished test')
@@ -164,7 +167,7 @@ def generate_test_graphs(results):
 def main(args):
     start_time = time.time()
     tprint('Parsing test spec')
-    with open(args.config_file, 'r') as config_fo:
+    with open(args.spec, 'r') as config_fo:
         config_spec = parse_config_spec(config_fo)
 
     tprint('Processing test spec')
@@ -183,9 +186,9 @@ def main(args):
     plan = process_plan_spec(plan_spec, config)
 
     test_results = run_plan(plan, config)
-    tprint('Saving results to', args.results_file)
+    tprint('Saving results to', args.results)
 
-    with open(args.results_file, 'w') as results_fo:
+    with open(args.results, 'w') as results_fo:
         save_test_results(test_results, results_fo)
     generate_test_graphs(test_results)
     tprint('Script took', time.time() - start_time, 'seconds')
@@ -195,7 +198,7 @@ def sigint_handler(signal, frame):
     tprint('Sigint received, exiting')
     if plan_results is not None:
         tprint('Saving partial results')
-        with open(cmd_args.results_file, 'w') as results_fo:
+        with open(cmd_args.results, 'w') as results_fo:
             save_test_results(plan_results, results_fo)
     sys.exit(0)
 
