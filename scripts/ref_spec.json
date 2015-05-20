@@ -19,28 +19,28 @@
     "configs": {
         "single_d" : {
             "solver": "single_dense",
-            "run": "./run_test"
+            "run": "./run"
         },
         "row_2_d" : {
             "solver": "multi_dense",
-            "run": "mpirun -np 2 ./run_test --schedule schedule_gpu2.json"
+            "run": "mpirun -np 2 ./run --schedule schedule_gpu2.json"
         },
         "row_4_d" : {
             "solver": "multi_dense",
-            "run": "mpirun -np 4 ./run_test --schedule schedule_gpu4.json"
+            "run": "mpirun -np 4 ./run --schedule schedule_gpu4.json"
         },
         "row_8_d" : {
             "name": "row_8_d",
             "solver": "multi_dense",
-            "run": "mpirun -np 8 ./run_test --schedule schedule_gpu8.json"
+            "run": "mpirun -np 8 ./run --schedule schedule_gpu8.json"
         },
         "row_16_d" : {
             "solver": "multi_dense",
-            "run": "mpirun -np 16 ./run_test --schedule schedule_gpu16.json"
+            "run": "mpirun -np 16 ./run --schedule schedule_gpu16.json"
         },
         "row_32_d" : {
             "solver": "multi_dense",
-            "run": "mpirun -np 32 ./run_test --schedule schedule_gpu32.json"
+            "run": "mpirun -np 32 ./run --schedule schedule_gpu32.json"
         }
     },
     "tests": {
