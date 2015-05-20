@@ -16,6 +16,8 @@ template <typename T>
 double LpEq(pogs::Schedule &s, size_t m, size_t n, int seed) {
   std::vector<T> A;
 
+  m = m - 1;
+
   int kRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
 
