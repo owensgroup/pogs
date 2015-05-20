@@ -1,5 +1,5 @@
 {
-    "solvers": [
+    "solvers": {
         "multi_dense" : {
             "arg_template":
             "--seed {seed} --type {typ} -m {m} -n {N}",
@@ -20,39 +20,34 @@
             "--seed {seed} --type {typ} -m {m} -n {N} --nnz {nnz}",
             "directory": "~/repos/pogs/examples/cpp_sp/"
         }
-    ]
-    "configs": [
-        {
-            "name": "single_d",
+    }
+    "configs": {
+        "single_d" : {
             "solver": "single_dense",
             "run": "./run_test"
         },
-        {
-            "name": "row_2_d",
+        "row_2_d" : {
             "solver": "multi_dense",
             "run": "mpirun -q -np 2 ./run_test --schedule schedule_gpu2.json"
         },
-        {
-            "name": "row_4_d",
+        "row_4_d" : {
             "solver": "multi_dense",
             "run": "mpirun -q -np 4 ./run_test --schedule schedule_gpu4.json"
         },
-        {
+        "row_8_d" : {
             "name": "row_8_d",
             "solver": "multi_dense",
             "run": "mpirun -q -np 8 ./run_test --schedule schedule_gpu8.json"
-        }
-        {
-            "name": "row_16_d",
+        },
+        "row_16_d" : {
             "solver": "multi_dense",
             "run": "mpirun -q -np 16 ./run_test --schedule schedule_gpu16.json"
         },
-        {
-            "name": "row_32_d",
+        "row_32_d" : {
             "solver": "multi_dense",
             "run": "mpirun -q -np 32 ./run_test --schedule schedule_gpu32.json"
         }
-    ],
+    },
     "tests": {
         "lasso_mn_d_1": {
             "type": "lasso",
