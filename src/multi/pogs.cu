@@ -34,17 +34,17 @@ char test_sep = ':';
 
 template <typename T>
 inline void TestPrintT(const char *name, T value) {
-  printf("%s %c %.3e\n", name, test_sep, value);
+  printf("BMARK %s %c %.3e\n", name, test_sep, value);
 }
 
 template <typename T>
 inline void TestIterPrintT(unsigned int iter, const char *name, T value) {
-  printf("iter, %d, %s %c %.3e\n", iter, name, test_sep, value);
+  printf("BMARK iter, %d, %s %c %.3e\n", iter, name, test_sep, value);
 }
 
 template <typename T>
 inline void TestIterPrintF(unsigned int iter, const char *name, T value) {
-  printf("iter, %d, %s %c %.3f\n", iter, name, test_sep, value);
+  printf("BMARK iter, %d, %s %c %.3f\n", iter, name, test_sep, value);
 }
 
 template <typename T, typename Op>
@@ -418,7 +418,6 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
                         ApplyOp<T, thrust::multiplies<T> >
                         (thrust::multiplies<T>()));
       optval = optval + FuncEval(g_gpu, x12.data);
-      T vf = FuncEval(g_gpu, x12.data);
       // Rescale
       thrust::transform(g_gpu.begin(), g_gpu.end(),
                         over_m.begin(), g_gpu.begin(),
@@ -491,7 +490,9 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
                     (thrust::multiplies<T>()));
 
   // Get optimal value
-  _optval = FuncEval(f_gpu, y12.data) + FuncEval(g_gpu, x12.data);
+  _optval = FuncEval(f_gpu, y12.data);
+  MPI_Allreduce(MPI_IN_PLACE, &_optval, 1, t_type, MPI_SUM, MPI_COMM_WORLD);
+  _optval = _optval + FuncEval(g_gpu, x12.data);
 
   // Check status
   PogsStatus status;
