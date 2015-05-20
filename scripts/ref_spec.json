@@ -4,7 +4,7 @@
             "arg_template":
             "--seed {seed} --type {typ} -m {m} -n {N}",
             "directory": "~/repos/pogs/examples/cpp_m/"
-        }
+        },
         "single_dense" : {
             "arg_template":
             "--seed {seed} --type {typ} -m {m} -n {N}",
