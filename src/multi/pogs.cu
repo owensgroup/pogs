@@ -564,6 +564,9 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
   cublasDestroy(hdl);
   CUDA_CHECK_ERR();
 
+  MPI_Comm_free(&avg_comm);
+  MPI_Comm_free(&exch_comm);
+
   return status;
 }
 

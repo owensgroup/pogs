@@ -162,6 +162,9 @@ T Norm2Est(cublasHandle_t hdl, const MatrixDist<T> *A) {
 
   cml::vector_free(&x);
   cml::vector_free(&Sx);
+
+  MPI_Comm_free(&Sx_comm);
+  MPI_Comm_free(&x_comm);
   return norm_est;
 }
 
@@ -218,6 +221,9 @@ void SinkhornKnopp(cublasHandle_t hdl, const MatrixDist<T> *A, T *d, T *e) {
     cudaDeviceSynchronize();
     CUDA_CHECK_ERR();
   }
+
+  MPI_Comm_free(&row_comm);
+  MPI_Comm_free(&col_comm);
 }
 
 }  // namespace

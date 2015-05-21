@@ -199,6 +199,9 @@ int MatrixDistDense<T>::Mul(char trans, T alpha, const T *x, T beta, T *y)
 
   CUDA_CHECK_ERR();
 
+  MPI_Comm_free(&row_comm);
+  MPI_Comm_free(&col_comm);
+
   return 0;
 }
 
