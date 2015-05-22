@@ -12,10 +12,12 @@
 //
 // See <pogs>/matlab/examples/lp_eq.m for detailed description.
 template <typename T>
-double LpEq(size_t m, size_t n) {
+double LpEq(size_t m, size_t n, unsigned seed) {
+  m = m - 1;
+
   std::vector<T> A((m + 1) * n);
 
-  std::default_random_engine generator;
+  std::default_random_engine generator{seed};
   std::uniform_real_distribution<T> u_dist(static_cast<T>(0),
                                            static_cast<T>(1));
 
@@ -56,6 +58,5 @@ double LpEq(size_t m, size_t n) {
   return timer<double>() - t;
 }
 
-template double LpEq<double>(size_t m, size_t n);
-template double LpEq<float>(size_t m, size_t n);
-
+template double LpEq<double>(size_t m, size_t n, unsigned seed);
+template double LpEq<float>(size_t m, size_t n, unsigned seed);

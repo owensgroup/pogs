@@ -1,6 +1,15 @@
 # Instructions
 # 1. To build with openmp set IFLAGS=-fopenmp
 
+# Set vpath for build
+ifeq (cpu,$(MAKECMDGOALS))
+	vpath % cpu:cpu/matrix:cpu/projector
+else ifeq (gpu,$(MAKECMDGOALS))
+	vpath % gpu:gpu/matrix:gpu/projector
+else ifeq (multi,$(MAKECMDGOALS))
+	vpath % multi:multi/matrix:multi/projector
+endif
+
 # Bulid directory
 OBJDIR=build
 
@@ -110,14 +119,6 @@ MULTI_PRJ_OBJ=\
 #   $(OBJDIR)/multi/projector/projector_cgls.o
 MULTI_OBJ=$(OBJDIR)/multi/pogs.o
 
-# Set vpath for build
-ifeq (cpu,$(MAKECMDGOALS))
-	vpath % cpu:cpu/matrix:cpu/projector
-else ifeq (gpu,$(MAKECMDGOALS))
-	vpath % gpu:gpu/matrix:gpu/projector
-else ifeq (multi,$(MAKECMDGOALS))
-	vpath % multi:multi/matrix:multi/projector
-endif
 
 # Build all
 cpu: $(CPU_OBJ) $(CPU_MTX_OBJ) $(CPU_PRJ_OBJ)

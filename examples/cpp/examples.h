@@ -4,7 +4,7 @@
 #include <cstdlib>
 
 template <typename T>
-double Lasso(size_t m, size_t n, int seed);
+double Lasso(size_t m, size_t n, unsigned seed);
 
 template <typename T>
 double LassoPath(size_t m, size_t n);
@@ -13,7 +13,7 @@ template <typename T>
 double Logistic(size_t m, size_t n);
 
 template <typename T>
-double LpEq(size_t m, size_t n);
+double LpEq(size_t m, size_t n, unsigned seed);
 
 template <typename T>
 double LpIneq(size_t m, size_t n);

@@ -28,7 +28,7 @@ double Lasso(pogs::Schedule &s, size_t m, size_t n, int seed) {
     b.resize(m);
 
     printf("seed: %d\n", seed);
-    std::minstd_rand0 generator{seed};
+    std::default_random_engine generator{seed};
     std::uniform_real_distribution<T> u_dist(static_cast<T>(0),
                                              static_cast<T>(1));
     std::normal_distribution<T> n_dist(static_cast<T>(0),

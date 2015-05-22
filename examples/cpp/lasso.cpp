@@ -11,12 +11,12 @@
 //
 // See <pogs>/matlab/examples/lasso.m for detailed description.
 template <typename T>
-double Lasso(size_t m, size_t n, int seed) {
+double Lasso(size_t m, size_t n, unsigned seed) {
   std::vector<T> A(m * n);
   std::vector<T> b(m);
 
   printf("seed: %d\n", seed);
-  std::minstd_rand0 generator{seed};
+  std::default_random_engine generator{seed};
   std::uniform_real_distribution<T> u_dist(static_cast<T>(0),
                                            static_cast<T>(1));
   std::normal_distribution<T> n_dist(static_cast<T>(0),
@@ -73,6 +73,6 @@ double Lasso(size_t m, size_t n, int seed) {
   return timer<double>() - t;
 }
 
-template double Lasso<double>(size_t m, size_t n, int seed);
-template double Lasso<float>(size_t m, size_t n, int seed);
+template double Lasso<double>(size_t m, size_t n, unsigned seed);
+template double Lasso<float>(size_t m, size_t n, unsigned seed);
 
