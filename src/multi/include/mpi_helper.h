@@ -63,7 +63,7 @@ int Reduce(cublasHandle_t b_hdl,
   MPI_Comm_size(comm, &commSize);
 
   if (kRank == node) {
-    cml::vector<T> recv = cml::vector_view_array(recv, count);
+    cml::vector<T> recv_v = cml::vector_view_array(recv, count);
     cml::matrix<T, CblasRowMajor> gather_buf =
       cml::matrix_calloc<T, CblasRowMajor>(commSize, count);
     cml::vector<T> ident = cml::vector_alloc<T>(commSize);
@@ -72,7 +72,7 @@ int Reduce(cublasHandle_t b_hdl,
 
     int r =
       MPI_Gather(send, count, t_type, gather_buf.data, count, t_type, node, comm);
-    cml::blas_gemv(b_hdl, CUBLAS_OP_T, 1, &gather_buf, &ident, 0, recv);
+    cml::blas_gemv(b_hdl, CUBLAS_OP_T, 1, &gather_buf, &ident, 0, recv_v);
 
     cml::matrix_free(&gather_buf);
     cml::vector_free(&ident);
