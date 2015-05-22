@@ -11,7 +11,7 @@
 //
 // See <pogs>/matlab/examples/lp_ineq.m for detailed description.
 template <typename T>
-double LpIneq(size_t m, size_t n) {
+double LpIneq(size_t m, size_t n, unsigned seed) {
   std::vector<T> A(m * n);
 
   std::default_random_engine generator;
@@ -52,6 +52,5 @@ double LpIneq(size_t m, size_t n) {
   return timer<double>() - t;
 }
 
-template double LpIneq<double>(size_t m, size_t n);
-template double LpIneq<float>(size_t m, size_t n);
-
+template double LpIneq<double>(size_t m, size_t n, unsigned seed);
+template double LpIneq<float>(size_t m, size_t n, unsigned seed);

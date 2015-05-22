@@ -12,7 +12,7 @@ using namespace pogs;
 //
 // See <pogs>/matlab/examples/svm.m for detailed description.
 template <typename T>
-double Svm(size_t m, size_t n) {
+double Svm(size_t m, size_t n, unsigned seed) {
   std::vector<T> A(m * (n + 1));
 
   std::default_random_engine generator;
@@ -57,6 +57,5 @@ double Svm(size_t m, size_t n) {
   return timer<double>() - t;
 }
 
-template double Svm<double>(size_t m, size_t n);
-template double Svm<float>(size_t m, size_t n);
-
+template double Svm<double>(size_t m, size_t n, unsigned seed);
+template double Svm<float>(size_t m, size_t n, unsigned seed);

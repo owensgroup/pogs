@@ -13,7 +13,7 @@ using namespace pogs;
 //
 // See <pogs>/matlab/examples/nonneg_l2.m for detailed description.
 template <typename T>
-double NonNegL2(size_t m, size_t n) {
+double NonNegL2(size_t m, size_t n, unsigned seed) {
   std::vector<T> A(m * n);
 
   std::default_random_engine generator;
@@ -54,6 +54,5 @@ double NonNegL2(size_t m, size_t n) {
   return timer<double>() - t;
 }
 
-template double NonNegL2<double>(size_t m, size_t n);
-template double NonNegL2<float>(size_t m, size_t n);
-
+template double NonNegL2<double>(size_t m, size_t n, unsigned seed);
+template double NonNegL2<float>(size_t m, size_t n, unsigned seed);

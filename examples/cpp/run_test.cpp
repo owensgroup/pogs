@@ -14,7 +14,7 @@
 typedef double real_t;
 
 template<typename T>
-using ProblemFn = double (*)(size_t m, size_t n, int seed);
+using ProblemFn = double (*)(size_t m, size_t n, unsigned seed);
 
 enum ProblemType {
   LASSO,
@@ -27,7 +27,7 @@ enum ProblemType {
 };
 
 template <typename T>
-double ErrorProblem(Schedule&, size_t, size_t, int) {
+double ErrorProblem(size_t, size_t, unsigned) {
   std::cerr << "Problem type invalid" << std::endl;
   std::exit(EXIT_FAILURE);
   return 0.0;

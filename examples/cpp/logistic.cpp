@@ -14,7 +14,7 @@ using namespace pogs;
 // for 50 values of \lambda.
 // See <pogs>/matlab/examples/logistic_regression.m for detailed description.
 template <typename T>
-double Logistic(size_t m, size_t n) {
+double Logistic(size_t m, size_t n, unsigned seed) {
   std::vector<T> A(m * (n + 1));
   std::vector<T> d(m);
 
@@ -79,6 +79,5 @@ double Logistic(size_t m, size_t n) {
   return timer<double>() - t;
 }
 
-template double Logistic<double>(size_t m, size_t n);
-template double Logistic<float>(size_t m, size_t n);
-
+template double Logistic<double>(size_t m, size_t n, unsigned seed);
+template double Logistic<float>(size_t m, size_t n, unsigned seed);

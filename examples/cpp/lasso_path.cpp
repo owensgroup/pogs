@@ -36,7 +36,7 @@ T Asum(std::vector<T> *v) {
 // for 50 values of \lambda.
 // See <pogs>/matlab/examples/lasso_path.m for detailed description.
 template <typename T>
-double LassoPath(size_t m, size_t n) {
+double LassoPath(size_t m, size_t n, unsigned seed) {
   unsigned int nlambda = 100;
   std::vector<T> A(m * n);
   std::vector<T> b(m);
@@ -108,6 +108,5 @@ double LassoPath(size_t m, size_t n) {
   return timer<double>() - t;
 }
 
-template double LassoPath<double>(size_t m, size_t n);
-template double LassoPath<float>(size_t m, size_t n);
-
+template double LassoPath<double>(size_t m, size_t n, unsigned seed);
+template double LassoPath<float>(size_t m, size_t n, unsigned seed);

@@ -7,22 +7,22 @@ template <typename T>
 double Lasso(size_t m, size_t n, unsigned seed);
 
 template <typename T>
-double LassoPath(size_t m, size_t n);
+double LassoPath(size_t m, size_t n, unsigned seed);
 
 template <typename T>
-double Logistic(size_t m, size_t n);
+double Logistic(size_t m, size_t n, unsigned seed);
 
 template <typename T>
 double LpEq(size_t m, size_t n, unsigned seed);
 
 template <typename T>
-double LpIneq(size_t m, size_t n);
+double LpIneq(size_t m, size_t n, unsigned seed);
 
 template <typename T>
-double NonNegL2(size_t m, size_t n);
+double NonNegL2(size_t m, size_t n, unsigned seed);
 
 template <typename T>
-double Svm(size_t m, size_t n);
+double Svm(size_t m, size_t n, unsigned seed);
 
 #endif  // EXAMPLES_H_
 
