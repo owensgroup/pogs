@@ -76,7 +76,7 @@ int Reduce(cublasHandle_t b_hdl,
       MPI_Gather(send, count, t_type, gather_buf.data, count, t_type, node,
                  comm);
     cml::blas_gemv(b_hdl, CUBLAS_OP_T, kOne, &gather_buf, &ident, kZero,
-                   recv_v);
+                   &recv_v);
 
     cml::matrix_free(&gather_buf);
     cml::vector_free(&ident);
@@ -119,7 +119,7 @@ int Allreduce(cublasHandle_t b_hdl,
 
   int r =
     MPI_Allgather(send, count, t_type, gather_buf.data, count, t_type, comm);
-  cml::blas_gemv(b_hdl, CUBLAS_OP_T, kOne, &gather_buf, &ident, kZero, recv_v);
+  cml::blas_gemv(b_hdl, CUBLAS_OP_T, kOne, &gather_buf, &ident, kZero, &recv_v);
 
   cml::matrix_free(&gather_buf);
   cml::vector_free(&ident);
