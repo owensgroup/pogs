@@ -31,7 +31,7 @@ cpu: run_all.cpp examples.h $(EXSRC)
 	$(CXX) $(CXXFLAGS) -o run $(EXSRC) $<	$(POGSROOT)/build/pogs.a $(LDFLAGS)
 
 # GPU
-gpu: run_all.cpp examples.h $(EXSRC)
+gpu: run_test.cpp examples.h $(EXSRC)
 	$(MAKE) gpu -C $(POGSROOT) IFLAGS=$(IFLAGS)
 	$(CXX) $(CXXFLAGS) -o run $(EXSRC) $<	$(POGSROOT)/build/pogs.a $(CULDFLAGS)
 
