@@ -146,6 +146,7 @@ void DistributeProximals(const Schedule &schedule,
     }
   }
 
+  cudaDeviceSynchronize();
   MPI_Barrier(MPI_COMM_WORLD);
 
   const BlockMeta &meta = schedule.At(kRank).block;
@@ -232,6 +233,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
   cml::vector<T> ztemp = cml::vector_calloc<T>(m_block + n_block);
   cml::vector<T> z12   = cml::vector_calloc<T>(m_block + n_block);
   cml::vector<T> x_avg = cml::vector_calloc<T>(n_block);
+  cml::vector<T> x_avg_temp = cml::vector_calloc<T>(n_block);
   CUDA_CHECK_ERR();
 
   // Create views for x and y components.
@@ -473,12 +475,13 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     cml::vector_memcpy(&x_avg, &x);
     cml::blas_axpy(hdl, -kOne, &xt, &x_avg);
     MASTER(kRank) {
-      MPI_Reduce(MPI_IN_PLACE, x_avg.data, x_avg.size, t_type, MPI_SUM, 0,
-               MPI_COMM_WORLD);
+      mpih::Reduce(hdl, x_avg.data, x_avg_temp.data, x_avg.size, MPI_SUM, 0,
+                   MPI_COMM_WORLD);
+      cml::vector_memcpy(&x_avg, &x_avg_temp);
       cml::blas_scal(hdl, 1.0 / _A.GetSchedule().MBlocks(), &x_avg);
     } else {
-      MPI_Reduce(x_avg.data, x_avg.data, x_avg.size, t_type, MPI_SUM, 0,
-                 MPI_COMM_WORLD);
+      mpih::Reduce(hdl, x_avg.data, x_avg.data, x_avg.size, MPI_SUM, 0,
+                   MPI_COMM_WORLD);
     }
     MPI_Bcast(x_avg.data, x_avg.size, t_type, 0, MPI_COMM_WORLD);
   }
@@ -561,6 +564,8 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
   cml::vector_free(&z12);
   cml::vector_free(&zprev);
   cml::vector_free(&ztemp);
+  cml::vector_free(&x_avg);
+  cml::vector_free(&x_avg_temp);
   cublasDestroy(hdl);
   CUDA_CHECK_ERR();
 

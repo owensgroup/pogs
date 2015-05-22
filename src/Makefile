@@ -5,10 +5,11 @@
 OBJDIR=build
 
 # MPI Flags
-MPI_CFLAGS = #$(shell mpic++ --showme:compile)
-MPI_LFLAGS = #$(shell mpic++ --showme:link)
+MPI_CFLAGS = $(shell mpic++ --showme:compile)
+MPI_LFLAGS = $(shell mpic++ --showme:link)
 
-MPI_ROOT=/home/abpoms/mvapich2-2.1
+#MPI_ROOT=/home/abpoms/mvapich2-2.1
+MPI_ROOT=/usr/local/openmpi
 MPI_CFLAGS=-I$(MPI_ROOT)/include 
 MPI_LFLAGS=-Xlinker -rpath -Xlinker $(MPI_ROOT)/lib -Xlinker \
 --enable-new-dtags -L$(MPI_ROOT)/lib -lmpi_cxx -lmpi

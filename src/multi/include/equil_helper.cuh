@@ -8,6 +8,7 @@
 #include "cml/cml_vector.cuh"
 #include "matrix/matrix_dist.h"
 #include "util.h"
+#include "mpi_helper.h"
 
 namespace pogs {
 namespace {
@@ -127,6 +128,9 @@ T Norm2Est(cublasHandle_t hdl, const MatrixDist<T> *A) {
   cml::vector<T> x = cml::vector_alloc<T>(block.Cols());
   cml::vector<T> Sx = cml::vector_alloc<T>(block.Rows());
 
+  cml::vector<T> x_temp = cml::vector_alloc<T>(block.Cols());
+  cml::vector<T> Sx_temp = cml::vector_alloc<T>(block.Rows());
+
   cml::rand(x.data, x.size);
   cudaDeviceSynchronize();
 
@@ -136,12 +140,14 @@ T Norm2Est(cublasHandle_t hdl, const MatrixDist<T> *A) {
     A->BlockMul('n', static_cast<T>(1.), x.data, static_cast<T>(0.), Sx.data);
     cudaDeviceSynchronize();
     // Reduce local matrix mults by summing partial column products together
-    MPI_Allreduce(MPI_IN_PLACE, Sx.data, Sx.size, t_type, MPI_SUM, Sx_comm);
+    mpih::Allreduce(hdl, Sx.data, Sx_temp.data, Sx.size, MPI_SUM, Sx_comm);
+    cml::vector_memcpy(&Sx, &Sx_temp);
 
     A->BlockMul('t', static_cast<T>(1.), Sx.data, static_cast<T>(0.), x.data);
     cudaDeviceSynchronize();
     // Reduce local matrix mults by summing partial column products together
-    MPI_Allreduce(MPI_IN_PLACE, x.data, x.size, t_type, MPI_SUM, x_comm);
+    mpih::Allreduce(hdl, x.data, x_temp.data, x.size, MPI_SUM, x_comm);
+    cml::vector_memcpy(&x, &x_temp);
 
     // Calculate global norms by collecting partial row norm values
     T normx;
@@ -188,13 +194,18 @@ void SinkhornKnopp(cublasHandle_t hdl, const MatrixDist<T> *A, T *d, T *e) {
   cml::vector_set_all(&d_vec, static_cast<T>(1.));
   cml::vector_set_all(&e_vec, static_cast<T>(1.));
 
+  cml::vector<T> d_vec_temp = cml::vector_calloc<T>(block.Rows());
+  cml::vector<T> e_vec_temp = cml::vector_calloc<T>(block.Cols());
+
   for (unsigned int k = 0; k < kEquilIter; ++k) {
     // e := 1 ./ (A' * d).
     A->BlockMul('t', static_cast<T>(1.), d, static_cast<T>(0.), e);
     cudaDeviceSynchronize();
     CUDA_CHECK_ERR();
-    MPI_Allreduce(MPI_IN_PLACE, e_vec.data, e_vec.size, t_type, MPI_SUM,
-                  col_comm);
+           e_vec.data, e_vec.size);
+    mpih::Allreduce(hdl, e_vec.data, e_vec_temp.data, e_vec.size, MPI_SUM,
+                    col_comm);
+    cml::vector_memcpy(&e_vec, &e_vec_temp);
 
     cml::vector_add_constant(&e_vec,
         static_cast<T>(kSinkhornConst) * (A->Rows() + A->Cols()) / A->Rows());
@@ -209,8 +220,10 @@ void SinkhornKnopp(cublasHandle_t hdl, const MatrixDist<T> *A, T *d, T *e) {
     A->BlockMul('n', static_cast<T>(1.), e, static_cast<T>(0.), d);
     cudaDeviceSynchronize();
     CUDA_CHECK_ERR();
-    MPI_Allreduce(MPI_IN_PLACE, d_vec.data, d_vec.size, t_type, MPI_SUM,
-                  row_comm);
+
+    mpih::Allreduce(hdl, d_vec.data, d_vec_temp.data, d_vec.size, MPI_SUM,
+                    row_comm);
+    cml::vector_memcpy(&d_vec, &d_vec_temp);
 
     cml::vector_add_constant(&d_vec,
         static_cast<T>(kSinkhornConst) * (A->Rows() + A->Cols()) / A->Cols());

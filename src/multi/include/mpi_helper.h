@@ -56,8 +56,8 @@ int Reduce(cublasHandle_t b_hdl,
     printf("Reduce only supports MPI_SUM right now\n");
     exit(-1);
   }
-  T kZero = 0;
-  T kOne = 1;
+  const T kZero = 0;
+  const T kOne = 1;
 
   int kRank;
   int commSize;
@@ -67,7 +67,7 @@ int Reduce(cublasHandle_t b_hdl,
   if (kRank == node) {
     cml::vector<T> recv_v = cml::vector_view_array(recv, count);
     cml::matrix<T, CblasRowMajor> gather_buf =
-      cml::matrix_calloc<T, CblasRowMajor>(commSize, count);
+      cml::matrix_alloc<T, CblasRowMajor>(commSize, count);
     cml::vector<T> ident = cml::vector_alloc<T>(commSize);
 
     cml::vector_set_all(&ident, kOne);
@@ -103,8 +103,8 @@ int Allreduce(cublasHandle_t b_hdl,
     printf("Allreduce only supports MPI_SUM right now\n");
     exit(-1);
   }
-  T kZero = 0;
-  T kOne = 1;
+  const T kZero = 0;
+  const T kOne = 1;
 
   int commSize;
   MPI_Comm_size(comm, &commSize);
@@ -112,13 +112,14 @@ int Allreduce(cublasHandle_t b_hdl,
   cml::vector<T> recv_v = cml::vector_view_array(recv, count);
 
   cml::matrix<T, CblasRowMajor> gather_buf =
-    cml::matrix_calloc<T, CblasRowMajor>(commSize, count);
+    cml::matrix_alloc<T, CblasRowMajor>(commSize, count);
   cml::vector<T> ident = cml::vector_alloc<T>(commSize);
 
   cml::vector_set_all(&ident, kOne);
 
   int r =
     MPI_Allgather(send, count, t_type, gather_buf.data, count, t_type, comm);
+  cudaDeviceSynchronize();
   cml::blas_gemv(b_hdl, CUBLAS_OP_T, kOne, &gather_buf, &ident, kZero, &recv_v);
 
   cml::matrix_free(&gather_buf);

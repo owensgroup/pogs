@@ -16,10 +16,11 @@ CXXFLAGS=$(IFLAGS) -g -O3 -I$(POGSROOT)/include $(LIB_BOOST) -std=c++11 -Wall -W
 CULDFLAGS_=-lcudart -lcublas -lcusparse -I$(CUDAROOT)/include -I./include $(LD_BOOST)  $(LIB_BOOST)
 
 # MPI Flags
-MPI_CFLAGS = #$(shell mpic++ --showme:compile)
-MPI_LFLAGS = #$(shell mpic++ --showme:link)
+MPI_CFLAGS = $(shell mpic++ --showme:compile)
+MPI_LFLAGS = $(shell mpic++ --showme:link)
 
-MPI_ROOT=/home/abpoms/mvapich2-2.1
+#MPI_ROOT=/home/abpoms/mvapich2-2.1
+MPI_ROOT=/usr/local/openmpi
 MPI_CFLAGS=-I$(MPI_ROOT)/include 
 MPI_LFLAGS=-Xlinker -rpath -Xlinker $(MPI_ROOT)/lib -Xlinker \
 --enable-new-dtags -L$(MPI_ROOT)/lib -lmpi_cxx -lmpi
@@ -45,5 +46,6 @@ gpu: run_test.cpp examples.h $(EXSRC)
 	$(CXX) $(CXXFLAGS) $(MPI_CFLAGS) -o run $(EXSRC) $< $(POGSROOT)/build/pogs.a $(CULDFLAGS) $(MPI_LFLAGS)
 
 clean:
+	$(MAKE) -C $(POGSROOT) clean
 	rm -f *.o *~ *~ run
 	rm -rf *.dSYM
