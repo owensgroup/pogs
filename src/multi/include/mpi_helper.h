@@ -44,11 +44,55 @@ T dist_blas_nrm2(cublasHandle_t handle, const cml::vector<T> *x) {
 }
 
 template <typename T>
-int Allreduce(cublasHandle_t b_hdl,
-              T *send, T *recv, int count, MPI_Op op, MPI_Comm comm) {
+int Reduce(cublasHandle_t b_hdl,
+           T *send, T *recv, int count, MPI_Op op, int node, MPI_Comm comm) {
+  MPI_Datatype t_type = MPIDTypeFromT<T>();
   // MVAPICH
 #if MVAPICH
-  return MPI_Allreduce(send, recv, count, op, comm);
+  return MPI_Reduce(send, recv, count, t_type, op, node, comm);
+#else
+  // OpenMPI
+  if (op != MPI_SUM) {
+    printf("Reduce only supports MPI_SUM right now\n");
+    exit(-1);
+  }
+
+  int kRank;
+  int commSize;
+  MPI_Comm_rank(comm, &kRank);
+  MPI_Comm_size(comm, &commSize);
+
+  if (kRank == node) {
+    cml::vector<T> recv = cml::vector_view_array(recv, count);
+    cml::matrix<T, CblasRowMajor> gather_buf =
+      cml::matrix_calloc<T, CblasRowMajor>(commSize, count);
+    cml::vector<T> ident = cml::vector_alloc<T>(commSize);
+
+    cml::vector_set_all(&ident, 1);
+
+    int r =
+      MPI_Gather(send, count, t_type, gather_buf.data, count, t_type, node, comm);
+    cml::blas_gemv(b_hdl, CUBLAS_OP_T, 1, &gather_buf, &ident, 0, recv);
+
+    cml::matrix_free(&gather_buf);
+    cml::vector_free(&ident);
+
+    return r;
+  } else {
+    int r =
+      MPI_Gather(send, count, t_type, NULL, count, t_type, node, comm);
+    return r;
+  }
+#endif
+}
+
+template <typename T>
+int Allreduce(cublasHandle_t b_hdl,
+              T *send, T *recv, int count, MPI_Op op, MPI_Comm comm) {
+  MPI_Datatype t_type = MPIDTypeFromT<T>();
+  // MVAPICH
+#if MVAPICH
+  return MPI_Allreduce(send, recv, count, t_type, op, comm);
 #else
   // OpenMPI
   if (op != MPI_SUM) {
@@ -58,21 +102,23 @@ int Allreduce(cublasHandle_t b_hdl,
   int commSize;
   MPI_Comm_size(comm, &commSize);
 
-  MPI_Datatype t_type = MPIDTypeFromT<T>();
-
-  cml::vector<T> recv = cml::vector_view(recv, count);
+  cml::vector<T> recv_v = cml::vector_view_array(recv, count);
 
   cml::matrix<T, CblasRowMajor> gather_buf =
     cml::matrix_calloc<T, CblasRowMajor>(commSize, count);
   cml::vector<T> ident = cml::vector_alloc<T>(commSize);
 
-  cml::vector_set_all(&ident, kOne);
+  cml::vector_set_all(&ident, 1);
 
-  MPI_Allgather(send, count, t_type, gather_buf.data, count, t_type, comm);
-  cml::blas_gemv(b_hdl, CUBLAS_OP_T, kOne, &gather_buf, &ident, 0, recv);
+  int r =
+    MPI_Allgather(send, count, t_type, gather_buf.data, count, t_type, comm);
+  cml::blas_gemv(b_hdl, CUBLAS_OP_T, 1, &gather_buf, &ident, 0, recv_v);
 
   cml::matrix_free(&gather_buf);
   cml::vector_free(&ident);
+
+  return r;
+#endif
 }
 
 }
