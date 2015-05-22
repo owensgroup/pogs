@@ -56,6 +56,8 @@ int Reduce(cublasHandle_t b_hdl,
     printf("Reduce only supports MPI_SUM right now\n");
     exit(-1);
   }
+  T kZero = 0;
+  T kOne = 1;
 
   int kRank;
   int commSize;
@@ -68,11 +70,13 @@ int Reduce(cublasHandle_t b_hdl,
       cml::matrix_calloc<T, CblasRowMajor>(commSize, count);
     cml::vector<T> ident = cml::vector_alloc<T>(commSize);
 
-    cml::vector_set_all(&ident, 1);
+    cml::vector_set_all(&ident, kOne);
 
     int r =
-      MPI_Gather(send, count, t_type, gather_buf.data, count, t_type, node, comm);
-    cml::blas_gemv(b_hdl, CUBLAS_OP_T, 1, &gather_buf, &ident, 0, recv_v);
+      MPI_Gather(send, count, t_type, gather_buf.data, count, t_type, node,
+                 comm);
+    cml::blas_gemv(b_hdl, CUBLAS_OP_T, kOne, &gather_buf, &ident, kZero,
+                   recv_v);
 
     cml::matrix_free(&gather_buf);
     cml::vector_free(&ident);
@@ -99,6 +103,9 @@ int Allreduce(cublasHandle_t b_hdl,
     printf("Allreduce only supports MPI_SUM right now\n");
     exit(-1);
   }
+  T kZero = 0;
+  T kOne = 1;
+
   int commSize;
   MPI_Comm_size(comm, &commSize);
 
@@ -108,11 +115,11 @@ int Allreduce(cublasHandle_t b_hdl,
     cml::matrix_calloc<T, CblasRowMajor>(commSize, count);
   cml::vector<T> ident = cml::vector_alloc<T>(commSize);
 
-  cml::vector_set_all(&ident, 1);
+  cml::vector_set_all(&ident, kOne);
 
   int r =
     MPI_Allgather(send, count, t_type, gather_buf.data, count, t_type, comm);
-  cml::blas_gemv(b_hdl, CUBLAS_OP_T, 1, &gather_buf, &ident, 0, recv_v);
+  cml::blas_gemv(b_hdl, CUBLAS_OP_T, kOne, &gather_buf, &ident, kZero, recv_v);
 
   cml::matrix_free(&gather_buf);
   cml::vector_free(&ident);
