@@ -202,7 +202,6 @@ void SinkhornKnopp(cublasHandle_t hdl, const MatrixDist<T> *A, T *d, T *e) {
     A->BlockMul('t', static_cast<T>(1.), d, static_cast<T>(0.), e);
     cudaDeviceSynchronize();
     CUDA_CHECK_ERR();
-           e_vec.data, e_vec.size);
     mpih::Allreduce(hdl, e_vec.data, e_vec_temp.data, e_vec.size, MPI_SUM,
                     col_comm);
     cml::vector_memcpy(&e_vec, &e_vec_temp);
