@@ -10,6 +10,8 @@
 #include "timer.h"
 #include "util.h"
 
+#define NUM_RANDS 4
+
 // Lasso
 //   minimize    (1/2) ||Ax - b||_2^2 + \lambda ||x||_1
 //
@@ -27,23 +29,38 @@ double Lasso(pogs::Schedule &s, size_t m, size_t n, int seed) {
     A.resize(m * n);
     b.resize(m);
 
-    printf("seed: %d\n", seed);
-    std::default_random_engine generator{seed};
-    std::uniform_real_distribution<T> u_dist(static_cast<T>(0),
-                                             static_cast<T>(1));
-    std::normal_distribution<T> n_dist(static_cast<T>(0),
-                                       static_cast<T>(1));
+    std::uniform_real_distribution<T> u_dist_template(static_cast<T>(0),
+                                                      static_cast<T>(1));
+    std::normal_distribution<T> n_dist_template(static_cast<T>(0),
+                                                static_cast<T>(1));
 
+    std::default_random_engine generator[NUM_RANDS];
+    std::uniform_real_distribution<T> u_dist[NUM_RANDS];
+    std::normal_distribution<T> n_dist[NUM_RANDS];
 
-    for (unsigned int i = 0; i < m * n; ++i)
-      A[i] = n_dist(generator);
+    for (int i = 0; i < NUM_RANDS) {
+      generator[i].seed(seed + i);
+      u_dist[i].param(u_dist_template.param());
+      n_dist[i].param(n_dist_template.param());
+    }
+
+#ifdef _OPENMP
+#pragma omp parallel for num_threads(NUM_RANDS)
+#endif
+    for (int i = 0; i < NUM_RANDS; ++i) {
+      size_t thread_n = n / NUM_RANDS;
+      size_t offset = (thread_n * i) * m;
+      for (unsigned int j = 0; j < m * thread_n; ++j) {
+        A[offset + j] = n_dist[i](generator[i]);
+      }
+    }
 
     std::vector<T> x_true(n);
     for (unsigned int i = 0; i < n; ++i)
-      x_true[i] = u_dist(generator) < static_cast<T>(0.8)
-                                      ? static_cast<T>(0)
-                                      : n_dist(generator) /
-                                      static_cast<T>(std::sqrt(n));
+      x_true[i] = u_dist[0](generator[0]) < static_cast<T>(0.8)
+                                            ? static_cast<T>(0)
+                                            : n_dist[0](generator[0]) /
+                                            static_cast<T>(std::sqrt(n));
 
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -54,7 +71,7 @@ double Lasso(pogs::Schedule &s, size_t m, size_t n, int seed) {
     // b[i] += A[i + j * m] * x_true[j];
 
     for (unsigned int i = 0; i < m; ++i)
-      b[i] += static_cast<T>(0.5) * n_dist(generator);
+      b[i] += static_cast<T>(0.5) * n_dist[0](generator[0]);
 
     lambda_max = static_cast<T>(0);
 #ifdef _OPENMP
