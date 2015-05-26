@@ -110,8 +110,12 @@ int MatrixDistDense<T>::Init() {
   const BlockMeta &block = MatrixDist<T>::_S.At(kRank).block;
   size_t rows = block.Rows();
   size_t columns = block.Cols();
-  cudaMalloc(&_data, rows * columns * sizeof(T));
 
+  double mat_malloc = timer<double>();
+  cudaMalloc(&_data, rows * columns * sizeof(T));
+  mat_malloc = timer<double>() - mat_malloc;
+
+  double dist_mat = timer<double>();
   DistributeBlocks(MatrixDist<T>::_S,
                    _ord,
                    MatrixDist<T>::_m,
@@ -119,7 +123,12 @@ int MatrixDistDense<T>::Init() {
                    info->orig_data,
                    _data);
   DEBUG_CUDA_CHECK_ERR();
+  dist_mat = timer<double>() - dist_mat;
 
+  MASTER(kRank) {
+    BMARK_PRINT_T("matrix_malloc_time", mat_malloc);
+    BMARK_PRINT_T("distribute_matrix_time", dist_mat);
+  }
   return 0;
 }
 
