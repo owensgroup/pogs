@@ -38,7 +38,7 @@ double Lasso(pogs::Schedule &s, size_t m, size_t n, int seed) {
     std::uniform_real_distribution<T> u_dist[NUM_RANDS];
     std::normal_distribution<T> n_dist[NUM_RANDS];
 
-    for (int i = 0; i < NUM_RANDS) {
+    for (int i = 0; i < NUM_RANDS; ++i) {
       generator[i].seed(seed + i);
       u_dist[i].param(u_dist_template.param());
       n_dist[i].param(n_dist_template.param());
