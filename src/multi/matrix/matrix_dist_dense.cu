@@ -319,6 +319,9 @@ int MatrixDistDense<T>::Equil(T *d, T *e) {
   cudaDeviceSynchronize();
 
 #ifdef DEBUG
+  int kRank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
+
   T normD = mpih::dist_blas_nrm2(hdl, &d_vec);
   T normE = mpih::dist_blas_nrm2(hdl, &e_vec);
   MASTER(kRank) {
