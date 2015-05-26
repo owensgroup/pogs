@@ -318,10 +318,15 @@ int MatrixDistDense<T>::Equil(T *d, T *e) {
   cml::vector_scale(&e_vec, 1 / sqrt(normA));
   cudaDeviceSynchronize();
 
-  BMARK_PRINT_T("equil_time", timer<double>() - t0);
+#ifdef DEBUG
+  normD = mpih::dist_blas_nrm2(hdl, &d_vec);
+  normE = mpih::dist_blas_nrm2(hdl, &e_vec))
+  MASTER(kRank) {
+    BMARK_PRINT_T("equil_time", timer<double>() - t0);
 
-  DEBUG_PRINTF("norm A = %e, normd = %e, norme = %e\n", normA,
-      mpih::dist_blas_nrm2(hdl, &d_vec), mpih::dist_blas_nrm2(hdl, &e_vec));
+    DEBUG_PRINTF("norm A = %e, normd = %e, norme = %e\n", normA, normD, normE);
+  }
+#endif
 
   cudaFree(sign);
   CUDA_CHECK_ERR();

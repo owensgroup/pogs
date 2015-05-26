@@ -195,7 +195,9 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
   double prox_time = timer<double>();
   std::vector<FunctionObj<T> > local_f, local_g;
   DistributeProximals(_A.GetSchedule(), f, g, local_f, local_g);
-  BMARK_PRINT_T("dist_prox_time", timer<double>() - prox_time);
+  MASTER(kRank) {
+    BMARK_PRINT_T("dist_prox_time", timer<double>() - prox_time);
+  }
 
   // Extract values from pogs_data
   size_t m = _A.Rows();
