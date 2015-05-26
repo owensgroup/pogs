@@ -234,11 +234,11 @@
     } \
   } while (0)
 
-
 ////////////////////////////////////////////////////////////////////////////////
 /////////////////////////// -DDEBUG DEFINED ONLY ///////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 #ifndef DEBUG
+#define BMARK_SEP ":"
 
 #define DEBUG_ASSERT(statement)                  do { } while (0)
 #define DEBUG_ASSERT_EQ(a, b)                    do { } while (0)
@@ -263,8 +263,11 @@
 #define DEBUG_PRINT(message)                     do { } while (0)
 #define DEBUG_PRINTF_IF(statement, message, ...) do { } while (0)
 #define DEBUG_PRINT_IF(statement, message, ...)  do { } while (0)
+#define BMARK_PRINTF(name, format, ...)          do { } while (0)
+#define BMARK_PRINT_T(name, value)               do { } while (0)
 
 #else
+#define BMARK_SEP ":"
 
 #define DEBUG_ASSERT(statement) \
   do { \
@@ -477,7 +480,26 @@
     } \
   } while (0)
 
+// Printing for benchmarking purposes
+
+#define BMARK_PRINTF(name, format, ...) \
+  do { \
+    printf("BMARK %s" BMARK_SEP " ", name); \
+    printf(format, __VA_ARGS__); \
+    printf("\n"); \
+  } while (0)
+
+#define BMARK_PRINT_T(name, value) \
+  do { \
+    printf("BMARK %s" BMARK_SEP " %.3e\n", name, value); \
+  } while (0)
+
+/* #define BMARK_PRINT_T(name, ..., value) \ */
+/*   do { \ */
+/*     printf("BMARK %s" BMARK_SEP " %.3e\n", name, value); \ */
+/*   } while (0) */
+
+
 #endif
 
 #endif  // UTIL_H_
-

@@ -29,23 +29,6 @@ namespace pogs {
 
 namespace {
 
-// Printing for benchmarking purposes
-char test_sep = ':';
-
-template <typename T>
-inline void TestPrintT(const char *name, T value) {
-  printf("BMARK %s %c %.3e\n", name, test_sep, value);
-}
-
-template <typename T>
-inline void TestIterPrintT(unsigned int iter, const char *name, T value) {
-  printf("BMARK iter, %d, %s %c %.3e\n", iter, name, test_sep, value);
-}
-
-template <typename T>
-inline void TestIterPrintF(unsigned int iter, const char *name, T value) {
-  printf("BMARK iter, %d, %s %c %.3f\n", iter, name, test_sep, value);
-}
 
 template <typename T, typename Op>
 struct ApplyOp: thrust::binary_function<FunctionObj<T>, FunctionObj<T>, T> {
@@ -209,8 +192,10 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
 
   MPI_Datatype t_type = mpih::MPIDTypeFromT<T>();
 
+  double prox_time = timer<double>();
   std::vector<FunctionObj<T> > local_f, local_g;
   DistributeProximals(_A.GetSchedule(), f, g, local_f, local_g);
+  BMARK_PRINT_T("dist_prox_time", timer<double>() - prox_time);
 
   // Extract values from pogs_data
   size_t m = _A.Rows();
@@ -534,9 +519,9 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
              __HBAR__, _rel_tol * nrm_r / eps_pri, _rel_tol * nrm_s / eps_dua,
              _rel_tol * gap / eps_gap);
 
-      TestPrintT("final_optval", _optval);
-      TestPrintT("total_time", total);
-      printf("BMARK iterations %c %d\n", test_sep, k);
+      BMARK_PRINT_T("final_optval", _optval);
+      BMARK_PRINT_T("total_time", total);
+      BMARK_PRINTF("iterations", "%d", k);
     }
   }
 

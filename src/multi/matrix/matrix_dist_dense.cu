@@ -8,6 +8,7 @@
 #include "matrix/matrix_dist_dense.h"
 #include "util.h"
 #include "mpi_helper.h"
+#include "timer.h"
 
 
 namespace pogs {
@@ -211,6 +212,8 @@ int MatrixDistDense<T>::Equil(T *d, T *e) {
   if (!this->_done_init)
     return 1;
 
+  double t0 = timer<double>();
+
   // Extract cublas handle from _info.
   GpuData<T> *info = reinterpret_cast<GpuData<T>*>(this->_info);
   cublasHandle_t hdl = info->handle;
@@ -314,6 +317,8 @@ int MatrixDistDense<T>::Equil(T *d, T *e) {
   cml::vector_scale(&d_vec, 1 / sqrt(normA));
   cml::vector_scale(&e_vec, 1 / sqrt(normA));
   cudaDeviceSynchronize();
+
+  BMARK_PRINT_T("equil_time", timer<double>() - t0);
 
   DEBUG_PRINTF("norm A = %e, normd = %e, norme = %e\n", normA,
       mpih::dist_blas_nrm2(hdl, &d_vec), mpih::dist_blas_nrm2(hdl, &e_vec));

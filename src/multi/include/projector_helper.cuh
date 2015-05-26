@@ -3,7 +3,7 @@
 
 #include "cml/cml_blas.cuh" 
 #include "cml/cml_vector.cuh" 
-#include "matrix/matrix.h" 
+#include "matrix/matrix_dist.h" 
 #include "util.h" 
 
 namespace pogs {
@@ -14,7 +14,7 @@ namespace {
 //   2. x = min. ||Ax - y0||_2^2 + s||x - x0||_2^2
 //      <=> A^T(Ax - y0) + s(x - x0) = 0
 template <typename T>
-void CheckProjection(const Matrix<T> *A, const T *x0, const T *y0,
+void CheckProjection(const MatrixDist<T> *A, const T *x0, const T *y0,
                      const T *x, const T *y, T s, T tol) {
   cublasHandle_t hdl;
   cublasCreate(&hdl);
