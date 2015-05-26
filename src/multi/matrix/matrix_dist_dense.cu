@@ -319,11 +319,10 @@ int MatrixDistDense<T>::Equil(T *d, T *e) {
   cudaDeviceSynchronize();
 
 #ifdef DEBUG
-  normD = mpih::dist_blas_nrm2(hdl, &d_vec);
-  normE = mpih::dist_blas_nrm2(hdl, &e_vec))
+  T normD = mpih::dist_blas_nrm2(hdl, &d_vec);
+  T normE = mpih::dist_blas_nrm2(hdl, &e_vec))
   MASTER(kRank) {
     BMARK_PRINT_T("equil_time", timer<double>() - t0);
-
     DEBUG_PRINTF("norm A = %e, normd = %e, norme = %e\n", normA, normD, normE);
   }
 #endif
