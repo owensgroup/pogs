@@ -26,6 +26,6 @@ double NonNegL2(pogs::Schedule &s, size_t m, size_t n, int seed);
 
 template <typename T>
 double Svm(pogs::Schedule &s, size_t m, size_t n, int seed);
+*/
 
 #endif  // EXAMPLES_H_
-
