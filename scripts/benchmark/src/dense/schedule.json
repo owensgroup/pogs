@@ -1,0 +1,38 @@
+{
+    "m_blocks": 4,
+    "n_blocks": 1,
+    "info": [
+        {
+            "matrix": {},
+            "block": {
+                "row": 0,
+                "column": 0
+            },
+            "gpu_indicies": [0]
+        },
+        {
+            "matrix": {},
+            "block": {
+                "row": 1,
+                "column": 0
+            },
+            "gpu_indicies": [1]
+        },
+        {
+            "matrix": {},
+            "block": {
+                "row": 2,
+                "column": 0
+            },
+            "gpu_indicies": [2]
+        },
+        {
+            "matrix": {},
+            "block": {
+                "row": 3,
+                "column": 0
+            },
+            "gpu_indicies": [3]
+        }
+    ]
+}

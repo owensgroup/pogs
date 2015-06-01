@@ -1,0 +1,7 @@
+{
+    "m_blocks": 1,
+    "n_blocks": 1,
+    "info": [
+        { "block": { "row": 0, "column": 0 }, "gpu_indicies": [0] }
+    ]
+}

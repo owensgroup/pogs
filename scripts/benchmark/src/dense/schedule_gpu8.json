@@ -1,0 +1,14 @@
+{
+    "m_blocks": 8,
+    "n_blocks": 1,
+    "info": [
+        { "block": { "row": 0, "column": 0 }, "gpu_indicies": [0] },
+        { "block": { "row": 1, "column": 0 }, "gpu_indicies": [1] },
+        { "block": { "row": 2, "column": 0 }, "gpu_indicies": [2] },
+        { "block": { "row": 3, "column": 0 }, "gpu_indicies": [3] },
+        { "block": { "row": 4, "column": 0 }, "gpu_indicies": [4] },
+        { "block": { "row": 5, "column": 0 }, "gpu_indicies": [5] },
+        { "block": { "row": 6, "column": 0 }, "gpu_indicies": [0] },
+        { "block": { "row": 7, "column": 0 }, "gpu_indicies": [1] }
+    ]
+}
