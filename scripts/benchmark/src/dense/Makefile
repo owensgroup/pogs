@@ -1,5 +1,5 @@
 # User Vars
-POGSROOT=../../src
+POGSROOT=../../../../src
 CUDAROOT=/usr/local/cuda-6.5
 
 # Example Files
@@ -44,6 +44,11 @@ cpu: run_all.cpp examples.h $(EXSRC)
 gpu: run_test.cpp examples.h $(EXSRC)
 	$(MAKE) multi -C $(POGSROOT) IFLAGS=$(IFLAGS)
 	$(CXX) $(CXXFLAGS) $(MPI_CFLAGS) -o run $(EXSRC) $< $(POGSROOT)/build/pogs.a $(CULDFLAGS) $(MPI_LFLAGS)
+
+# GPU
+gen: gen_matrix.cpp examples.h $(EXSRC)
+	$(MAKE) multi -C $(POGSROOT) IFLAGS=$(IFLAGS)
+	$(CXX) $(CXXFLAGS) $(MPI_CFLAGS) -o gen_matrix $(EXSRC) $< $(POGSROOT)/build/pogs.a $(CULDFLAGS) $(MPI_LFLAGS)
 
 clean:
 	$(MAKE) -C $(POGSROOT) clean

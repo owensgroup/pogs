@@ -10,8 +10,6 @@
 #include <cstdio>
 #include <cstring>
 #include <mpi.h>
-#include <cuda.h>
-#include <cuda_runtime.h>
 #include "boost/program_options.hpp"
 
 #include "examples.h"
@@ -55,7 +53,7 @@ int main(int argc, char **argv) {
   // CUDA sometimes takes a long time on the first API call
   // We set device here so that we avoid measuring that setup time as
   // part of the test
-  cudaSetDevice(0);
+  //cudaSetDevice(0);
 
   MASTER(kRank) {
     po::options_description desc("Options");
