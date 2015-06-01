@@ -1,38 +1,24 @@
+# System imports
 from __future__ import print_function
 from collections import defaultdict
-from datetime import datetime
-
 import time
 import os
 import sys
 import signal
-import json
 import subprocess32 as subprocess
 import argparse
+import json
+
+# Project imports
+from util import (tprint,
+                  parse_config_spec,
+                  parse_plan_arg,
+                  parse_plan_file)
+
 
 # Need a global plan results to save partial results when interrupted
 cmd_args = None
 plan_results = None
-
-
-def tprint(*args, **kwargs):
-    print('[' + str(datetime.now()) + ']', *args, **kwargs)
-
-# output
-# - norms
-# - total time
-# - iteration time
-# - iteration #
-# - time for sub sections
-
-
-def parse_config_spec(file):
-    spec = json.load(file)
-    if not isinstance(spec, dict):
-        return 'Config root must be an object'
-    for solver_name, solver in spec['solvers'].iteritems():
-        solver['directory'] = os.path.expanduser(solver['directory'])
-    return spec
 
 
 def process_config_spec(spec):
@@ -50,20 +36,6 @@ def process_config_spec(spec):
     # # Process tests
     # return plan
     return spec
-
-
-def parse_plan_spec(plan_file):
-    pass
-
-
-def parse_plan_arg(plan_arg):
-    plan_spec = {}
-    for pair in plan_arg.split(';'):
-        pars = pair.split(':')
-        config = pars[0]
-        tests = pars[1].split(',')
-        plan_spec[config] = tests
-    return plan_spec
 
 
 def process_plan_spec(plan_spec, config):
@@ -105,63 +77,59 @@ def parse_solver_output(output, error):
 
 def run_plan(plan, config):
     global plan_results
+    plan_results = defaultdict(lambda: defaultdict(list))
 
     solvers = config['solvers']
     configs = config['configs']
     tests = config['tests']
 
-    tprint('Starting test plan')
-    plan_results = defaultdict(lambda: defaultdict(list))
-    for config_name, config_tests in plan.iteritems():
-        config_info = configs[config_name]
-        config_solver = solvers[config_info['solver']]
-        tprint('Starting config', config_name)
-        for test_name in config_tests:
-            test_info = tests[test_name]
-            tprint('Starting test', test_name)
-            for param in test_info['params']:
-                param['seed'] = 1000
-                param['typ'] = test_info['type']
-                args = config_solver['arg_template'].format(**param)
-                cmd = config_info['run'] + ' ' + args
-                tprint('Running task with run cmd:', cmd)
-                p = subprocess.Popen(
-                    cmd,
-                    cwd=config_solver['directory'],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    shell=True
-                )
-                tout = 60 * 60
-                try:
-                    sout, serr = p.communicate(timeout=tout)
-                except subprocess.TimeoutExpired:
-                    p.kill()
-                    tprint('Task timed out after', tout, 'seconds')
-                    sout, serr = p.communicate()
-                if p.returncode == 0:
-                    tprint('Finished task')
-                    result = parse_solver_output(sout, serr)
-                else:
-                    tprint('Error in task, return code:',
-                           str(p.returncode))
-                    result = {
-                        'out': sout,
-                        'err': serr
-                    }
-                plan_results[config_name][test_name].append(result)
-                tprint('Finished tasks')
-            tprint('Finished test')
-        tprint('Finished test plan')
+    config_name = plan['config_name']
+    test_name = plan['test_name']
+    param_num = plan['param_num']
+
+    config_info = configs[config_name]
+    config_solver = solvers[config_info['solver']]
+    tprint('Running ', config_name, ' for ', test_name,
+           ' for param num', param_num)
+
+    test_info = tests[test_name]
+    param = test_info['params'][param_num]
+    param['seed'] = 1000
+    param['typ'] = test_info['type']
+    args = config_solver['arg_template'].format(**param)
+    cmd = config_info['run'] + ' ' + args
+    tprint('Running test with run cmd:', cmd)
+    p = subprocess.Popen(
+        cmd,
+        cwd=config_solver['directory'],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True
+    )
+    tout = 60 * 60
+    try:
+        sout, serr = p.communicate(timeout=tout)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        tprint('Task timed out after', tout, 'seconds')
+        sout, serr = p.communicate()
+    if p.returncode == 0:
+        tprint('Finished task')
+        result = parse_solver_output(sout, serr)
+    else:
+        tprint('Error in task, return code:',
+               str(p.returncode))
+        result = {
+            'out': sout,
+            'err': serr
+        }
+    plan_results[config_name][test_name].append(result)
+    tprint('Finished test')
     return plan_results
 
 
 def save_test_results(results, out_fo):
     json.dump(results, out_fo)
-
-
-def generate_test_graphs(results):
-    pass
 
 
 def main(args):
@@ -176,7 +144,7 @@ def main(args):
     tprint('Parsing plan spec')
     if args.plan_file:
         with open(args.plan_file, 'r') as plan_fo:
-            plan_spec = parse_plan_spec(plan_fo)
+            plan_spec = parse_plan_file(plan_fo)
     elif args.plan:
         plan_spec = parse_plan_arg(args.plan)
     else:
@@ -190,7 +158,6 @@ def main(args):
 
     with open(args.results, 'w') as results_fo:
         save_test_results(test_results, results_fo)
-    generate_test_graphs(test_results)
     tprint('Script took', time.time() - start_time, 'seconds')
 
 
@@ -213,3 +180,5 @@ if __name__ == '__main__':
     parser.add_argument('--plan_file', nargs='?')
     cmd_args = parser.parse_args()
     main(cmd_args)
+
+# python benchmark.py --spec ref_spec.json --plan 'row_2_d:lasso_mn_d_1:2' --results fjkl.json

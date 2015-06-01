@@ -19,28 +19,38 @@
     "configs": {
         "single_d" : {
             "solver": "single_dense",
-            "run": "./run"
+            "run": "./run",
+            "resources": "nodes=1:k40:ppn=1"
         },
         "row_2_d" : {
             "solver": "multi_dense",
-            "run": "mpirun -np 2 ./run --schedule schedule_gpu2.json"
+            "run": "mpirun -np 2 ./run --schedule schedule_gpu2.json",
+            "resources": "nodes=1:k40x4:ppn=4"
         },
         "row_4_d" : {
             "solver": "multi_dense",
-            "run": "mpirun -np 4 ./run --schedule schedule_gpu4.json"
+            "run": "mpirun -np 4 ./run --schedule schedule_gpu4.json",
+            "resources": "nodes=1:k40x4:ppn=4"
         },
         "row_8_d" : {
-            "name": "row_8_d",
             "solver": "multi_dense",
-            "run": "mpirun -np 8 ./run --schedule schedule_gpu8.json"
+            "run": "mpirun -np 8 ./run --schedule schedule_gpu8.json",
+            "resources": "nodes=2:k40x6:ppn=6"
         },
         "row_16_d" : {
             "solver": "multi_dense",
-            "run": "mpirun -np 16 ./run --schedule schedule_gpu16.json"
+            "run": "mpirun -np 16 ./run --schedule schedule_gpu16.json",
+            "resources": "nodes=3:k40x6:ppn=6"
         },
         "row_32_d" : {
             "solver": "multi_dense",
-            "run": "mpirun -np 32 ./run --schedule schedule_gpu32.json"
+            "run": "mpirun -np 32 ./run --schedule schedule_gpu32.json",
+            "resources": "nodes=6:k40x6:ppn=6"
+        },
+        "row_64_d" : {
+            "solver": "multi_dense",
+            "run": "mpirun -np 64 ./run --schedule schedule_gpu64.json",
+            "resources": "nodes=11:k40x6:ppn=6"
         }
     },
     "tests": {

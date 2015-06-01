@@ -18,6 +18,6 @@ export MV2_USE_CUDA=1
 
 cd ~/repos/pogs
 source .env/bin/activate
-cd ~/repos/pogs/scripts
-python benchmark.py --spec ref_spec.json --plan ${test_arg} --results pbs/results/${result_file}_results.json
+cd ~/repos/pogs/scripts/benchmark
+python benchmark.py --spec ref_spec.json --plan ${test_arg} --results results/${result_file}_results.json
 deactivate
