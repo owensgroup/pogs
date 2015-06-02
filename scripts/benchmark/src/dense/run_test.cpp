@@ -17,10 +17,10 @@ typedef double real_t;
 
 int main(int argc, char **argv) {
   namespace po = boost::program_options;
-  std::vector<FunctionObj<T> > f;
-  std::vector<FunctionObj<T> > g;
+  std::vector<FunctionObj<real_t> > f;
+  std::vector<FunctionObj<real_t> > g;
 
-  T *a;
+  real_t *a;
   int m, n, seed;
   std::string typ;
   std::string schedule_file;
@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
   Schedule sched = parse_schedule(sched_string.data(), m, n);
 
   pogs::MatrixDistDense A_(s, 'r', m, n, a);
-  pogs::PogsDirect<T, pogs::MatrixDistDense<T> > pogs_data(A_);
+  pogs::PogsDirect<real_t, pogs::MatrixDistDense<real_t> > pogs_data(A_);
 
   pogs_data.Solve(f, g);
 
