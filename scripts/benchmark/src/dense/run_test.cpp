@@ -12,6 +12,8 @@
 
 #include "util.h"
 #include "parse_schedule.h"
+#include "pogs.h"
+#include "matrix/matrix_dist_dense.h"
 
 typedef double real_t;
 
@@ -28,8 +30,6 @@ int main(int argc, char **argv) {
   std::string matrix_file;
 
   int kRank;
-  ProblemType pType;
-  ProblemFn<real_t> problem;
 
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
@@ -79,7 +79,6 @@ int main(int argc, char **argv) {
     LoadMatrix(matrix_file, &a, f, g);
   }
 
-  MPI_Bcast(&pType, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast(&m, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast(&seed, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -100,10 +99,10 @@ int main(int argc, char **argv) {
 
   Schedule sched = parse_schedule(sched_string.data(), m, n);
 
-  pogs::MatrixDistDense A_(s, 'r', m, n, a);
+  pogs::MatrixDistDense<real_t> A_(s, 'r', m, n, a);
   pogs::PogsDirect<real_t, pogs::MatrixDistDense<real_t> > pogs_data(A_);
 
-  pogs_data.Solve(f, g);
+  ret = pogs_data.Solve(f, g);
 
   MPI_Finalize();
 
