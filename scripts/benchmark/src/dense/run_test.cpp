@@ -10,52 +10,22 @@
 #include <cuda_runtime.h>
 #include "boost/program_options.hpp"
 
-#include "examples.h"
 #include "util.h"
 #include "parse_schedule.h"
 
 typedef double real_t;
 
-template<typename T>
-using ProblemFn = double (*)(Schedule &s, size_t m, size_t n, int seed);
-
-enum ProblemType {
-  LASSO,
-  LASSO_PATH,
-  LOGISTIC,
-  LP_EQ,
-  LP_INEQ,
-  NON_NEG_L2,
-  SVM
-};
-
-inline int parse_int_arg(const char *arg, const char *errmsg) {
-  int out;
-  char *end;
-
-  out = static_cast<int>(strtol(arg, &end, 10));
-  if (end == arg) {
-    std::cerr << errmsg << std::endl;
-    std::exit(EXIT_FAILURE);
-  }
-
-  return out;
-}
-
-template <typename T>
-double ErrorProblem(Schedule&, size_t, size_t, int) {
-  std::cerr << "Problem type invalid" << std::endl;
-  std::exit(EXIT_FAILURE);
-  return 0.0;
-}
-
 int main(int argc, char **argv) {
   namespace po = boost::program_options;
+  std::vector<FunctionObj<T> > f;
+  std::vector<FunctionObj<T> > g;
 
+  T *a;
   int m, n, seed;
   std::string typ;
   std::string schedule_file;
   std::string sched_string;
+  std::string matrix_file;
 
   int kRank;
   ProblemType pType;
@@ -78,7 +48,8 @@ int main(int argc, char **argv) {
        "JSON file for schedule description")
       ("m", po::value<int>(&m), "# of rows in generated matrix")
       ("n", po::value<int>(&n), "# of columns in generated matrix")
-      ("seed", po::value<int>(&seed), "seed");
+      ("matrix", po::value<std::string>(&matrix_file),
+       "Binary file containing f, g, and A");
 
     po::variables_map vm;
     try {
@@ -101,27 +72,11 @@ int main(int argc, char **argv) {
       exit(EXIT_FAILURE);
     }
 
-    if (typ == "lasso") {
-      pType = LASSO;
-    } else if (typ == "lasso_path") {
-      pType = LASSO_PATH;
-    } else if (typ == "logistic") {
-      pType = LOGISTIC;
-    } else if (typ == "lp_eq") {
-      pType = LP_EQ;
-    } else if (typ == "lp_ineq") {
-      pType = LP_INEQ;
-    } else if (typ == "non_neg_l2") {
-      pType = NON_NEG_L2;
-    } else if (typ == "svm") {
-      pType = SVM;
-    } else {
-      std::cout << "No problem of that type\n" << std::endl;
-      std::exit(EXIT_FAILURE);
-    }
     std::ifstream sched_fs (schedule_file, std::fstream::in);
     sched_string = std::string((std::istreambuf_iterator<char>(sched_fs)),
                                std::istreambuf_iterator<char>());
+
+    LoadMatrix(matrix_file, &a, f, g);
   }
 
   MPI_Bcast(&pType, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -129,6 +84,7 @@ int main(int argc, char **argv) {
   MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast(&seed, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
+  // Sched
   size_t sched_size = sched_string.size();
   MPI_Bcast(&sched_size, sizeof(size_t), MPI_BYTE, 0, MPI_COMM_WORLD);
   char *buf = new char[sched_size + 1];
@@ -144,39 +100,16 @@ int main(int argc, char **argv) {
 
   Schedule sched = parse_schedule(sched_string.data(), m, n);
 
-  switch(pType) {
-  case LASSO:
-    problem = &Lasso<real_t>;
-    break;
-  case LASSO_PATH:
-    problem = &LassoPath<real_t>;
-    break;
-  case LOGISTIC:
-    problem = &Logistic<real_t>;
-    break;
-  case LP_EQ:
-    problem = &LpEq<real_t>;
-    break;
-  case LP_INEQ:
-    problem = &LpIneq<real_t>;
-    break;
-  case NON_NEG_L2:
-    problem = &NonNegL2<real_t>;
-    break;
-  case SVM:
-    problem = &Svm<real_t>;
-    break;
-  default:
-    problem = &ErrorProblem<real_t>;
-    break;
-  }
+  pogs::MatrixDistDense A_(s, 'r', m, n, a);
+  pogs::PogsDirect<T, pogs::MatrixDistDense<T> > pogs_data(A_);
 
-  double ret = problem(sched, m, n, seed);
-  if (ret != -1) {
-      ret = 0;
-  }
+  pogs_data.Solve(f, g);
 
   MPI_Finalize();
+
+  MASTER(kRank) {
+    delete[] a;
+  }
 
   return static_cast<int>(ret);
 }
