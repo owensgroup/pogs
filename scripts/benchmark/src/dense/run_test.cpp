@@ -99,10 +99,10 @@ int main(int argc, char **argv) {
 
   Schedule sched = parse_schedule(sched_string.data(), m, n);
 
-  pogs::MatrixDistDense<real_t> A_(s, 'r', m, n, a);
+  pogs::MatrixDistDense<real_t> A_(sched, 'r', m, n, a);
   pogs::PogsDirect<real_t, pogs::MatrixDistDense<real_t> > pogs_data(A_);
 
-  ret = pogs_data.Solve(f, g);
+  double ret = pogs_data.Solve(f, g);
 
   MPI_Finalize();
 
