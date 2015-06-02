@@ -42,6 +42,7 @@ int main(int argc, char **argv) {
 
   int m, n, seed;
   std::string typ;
+  std::string out;
 
   int kRank;
   ProblemType pType;
@@ -62,6 +63,7 @@ int main(int argc, char **argv) {
       ("type", po::value<std::string>(&typ), "Type of problem to generate")
       ("m", po::value<int>(&m), "# of rows in generated matrix")
       ("n", po::value<int>(&n), "# of columns in generated matrix")
+      ("out", po::value<std::string>(&out), "File to save matrix to")
       ("seed", po::value<int>(&seed), "seed");
 
     po::variables_map vm;
@@ -142,7 +144,7 @@ int main(int argc, char **argv) {
   printf("openmp max threads: %d\n", omp_get_max_threads());
   #endif
 
-  double ret = problem(m, n, seed);
+  double ret = problem(m, n, seed, out);
   if (ret != -1) {
       ret = 0;
   }

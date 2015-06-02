@@ -1,6 +1,7 @@
 #ifndef POGS_UTIL_H_
 #define POGS_UTIL_H_
 
+#include "pogs.h"
 #include <stdio.h>
 
 #define MASTER(kRank) if (kRank == 0)
@@ -15,7 +16,11 @@ void SaveMatrix(T *a,
   FILE* pFile;
   pFile = fopen(filename.c_str(), "wb");
   // Write out f operators
-  fwrite(f.size(), sizeof(f::size_type), 1, pFile);
+  auto f_size = f.size();
+  fwrite(&f_size,
+         sizeof(typename std::vector<FunctionObj<T> >::size_type),
+         1,
+         pFile);
   for (int i = 0; i < f.size(); i++) {
     FunctionObj<T> &fo = f[i];
     fwrite(&fo.h, sizeof(fo.h), 1, pFile);
@@ -26,7 +31,11 @@ void SaveMatrix(T *a,
     fwrite(&fo.e, sizeof(fo.e), 1, pFile);
   }
   // Write out g operators
-  fwrite(g.size(), sizeof(f::size_type), 1, pFile);
+  auto g_size = g.size();
+  fwrite(&g_size,
+         sizeof(typename std::vector<FunctionObj<T> >::size_type),
+         1,
+         pFile);
   for (int i = 0; i < g.size(); i++) {
     FunctionObj<T> &go = g[i];
     fwrite(&go.h, sizeof(go.h), 1, pFile);
@@ -49,8 +58,11 @@ void LoadMatrix(std::string filename,
   FILE* pFile;
   pFile = fopen(filename.c_str(), "rb");
   // Write out f operators
-  f::size_type f_size;
-  fread(&f_size, sizeof(f::size_type), 1, pFile);
+  typename std::vector<FunctionObj<T> >::size_type f_size;
+  fread(&f_size,
+        sizeof(typename std::vector<FunctionObj<T> >::size_type),
+        1,
+        pFile);
   for (int i = 0; i < f_size; i++) {
     FunctionObj<T> fo;
     fread(&fo.h, sizeof(fo.h), 1, pFile);
@@ -62,8 +74,11 @@ void LoadMatrix(std::string filename,
     f.push_back(fo);
   }
   // Write out g operators
-  g::size_type g_size;
-  fread(&g_size, sizeof(g::size_type), 1, pFile);
+  typename std::vector<FunctionObj<T> >::size_type g_size;
+  fread(&g_size,
+        sizeof(typename std::vector<FunctionObj<T> >::size_type),
+        1,
+        pFile);
   for (int i = 0; i < g_size; i++) {
     FunctionObj<T> go;
     fread(&go.h, sizeof(go.h), 1, pFile);
