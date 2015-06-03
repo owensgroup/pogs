@@ -10,20 +10,36 @@
 #include <cuda_runtime.h>
 #include "boost/program_options.hpp"
 
+#include "timer.h"
 #include "util.h"
 #include "parse_schedule.h"
 #include "pogs.h"
 #include "matrix/matrix_dist_dense.h"
+#include "examples.h"
 
-typedef double real_t;
+
+void BcastString(std::string &s) {
+  int kRank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
+  size_t s_size = s.size();
+  MPI_Bcast(&s_size, sizeof(size_t), MPI_BYTE, 0, MPI_COMM_WORLD);
+  char *buf = new char[s_size + 1];
+  MASTER(kRank) {
+    memcpy(buf, s.data(), s_size*sizeof(char));
+  }
+  s.resize(s_size);
+  MPI_Bcast(buf, s_size * sizeof(char), MPI_BYTE, 0, MPI_COMM_WORLD);
+  buf[s_size] = '\0';
+  s.resize(s_size);
+  s.replace(0, std::string::npos, buf);
+  delete [] buf;
+}
 
 int main(int argc, char **argv) {
   namespace po = boost::program_options;
-  std::vector<FunctionObj<real_t> > f;
-  std::vector<FunctionObj<real_t> > g;
 
-  real_t *a;
   int m, n, seed;
+  ExampleData<real_t> data;
   std::string typ;
   std::string schedule_file;
   std::string sched_string;
@@ -48,6 +64,7 @@ int main(int argc, char **argv) {
        "JSON file for schedule description")
       ("m", po::value<int>(&m), "# of rows in generated matrix")
       ("n", po::value<int>(&n), "# of columns in generated matrix")
+      ("seed", po::value<int>(&seed), "seed")
       ("matrix", po::value<std::string>(&matrix_file),
        "Binary file containing f, g, and A");
 
@@ -76,39 +93,36 @@ int main(int argc, char **argv) {
     sched_string = std::string((std::istreambuf_iterator<char>(sched_fs)),
                                std::istreambuf_iterator<char>());
 
-    LoadMatrix(matrix_file, &a, f, g);
+    if (matrix_file.size() > 0) {
+      real_t *a;
+      LoadMatrix(matrix_file, &a, data.f, data.g);
+      data.A = std::vector<real_t>(a, a + (data.f.size() * data.g.size()));
+      delete[] a;
+    } else {
+      ProblemType pType = GetProblemFn(typ);
+      GenFn<real_t> problem = ExampleFns[pType];
+      double t0 = timer<double>();
+      data = problem(m, n, seed);
+      printf("time to gen matrix: %.3e\n", timer<double>() - t0);
+    }
   }
 
   MPI_Bcast(&m, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast(&seed, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
+
   // Sched
-  size_t sched_size = sched_string.size();
-  MPI_Bcast(&sched_size, sizeof(size_t), MPI_BYTE, 0, MPI_COMM_WORLD);
-  char *buf = new char[sched_size + 1];
-  MASTER(kRank) {
-    memcpy(buf, sched_string.data(), sched_size*sizeof(char));
-  }
-  sched_string.resize(sched_size);
-  MPI_Bcast(buf, sched_size * sizeof(char), MPI_BYTE, 0, MPI_COMM_WORLD);
-  buf[sched_size] = '\0';
-  sched_string.resize(sched_size);
-  sched_string.replace(0, std::string::npos, buf);
-  delete [] buf;
+  BcastString(sched_string);
 
   Schedule sched = parse_schedule(sched_string.data(), m, n);
 
-  pogs::MatrixDistDense<real_t> A_(sched, 'r', m, n, a);
+  pogs::MatrixDistDense<real_t> A_(sched, 'r', m, n, data.A.data());
   pogs::PogsDirect<real_t, pogs::MatrixDistDense<real_t> > pogs_data(A_);
 
-  double ret = pogs_data.Solve(f, g);
+  double ret = pogs_data.Solve(data.f, data.g);
 
   MPI_Finalize();
-
-  MASTER(kRank) {
-    delete[] a;
-  }
 
   return static_cast<int>(ret);
 }

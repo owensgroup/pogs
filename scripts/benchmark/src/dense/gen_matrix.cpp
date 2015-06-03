@@ -15,27 +15,7 @@
 #include "examples.h"
 #include "util.h"
 
-typedef double real_t;
 
-template<typename T>
-using GenFn = ExampleData<T> (*)(size_t m, size_t n, int seed);
-
-enum ProblemType {
-  LASSO
-  // LASSO_PATH,
-  // LOGISTIC,
-  // LP_EQ,
-  // LP_INEQ,
-  // NON_NEG_L2,
-  // SVM
-};
-
-template <typename T>
-ExampleData<T> ErrorProblem(size_t, size_t, int) {
-  std::cerr << "Problem type invalid" << std::endl;
-  std::exit(EXIT_FAILURE);
-  return {};
-}
 
 int main(int argc, char **argv) {
   namespace po = boost::program_options;
@@ -86,25 +66,7 @@ int main(int argc, char **argv) {
       std::cerr << desc << std::endl;
       exit(EXIT_FAILURE);
     }
-
-    if (typ == "lasso") {
-      pType = LASSO;
-    // } else if (typ == "lasso_path") {
-    //   pType = LASSO_PATH;
-    // } else if (typ == "logistic") {
-    //   pType = LOGISTIC;
-    // } else if (typ == "lp_eq") {
-    //   pType = LP_EQ;
-    // } else if (typ == "lp_ineq") {
-    //   pType = LP_INEQ;
-    // } else if (typ == "non_neg_l2") {
-    //   pType = NON_NEG_L2;
-    // } else if (typ == "svm") {
-    //   pType = SVM;
-    } else {
-      std::cout << "No problem of that type\n" << std::endl;
-      std::exit(EXIT_FAILURE);
-    }
+    pType = GetProblemFn(typ);
   }
 
   MPI_Bcast(&pType, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -112,37 +74,12 @@ int main(int argc, char **argv) {
   MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast(&seed, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-  switch(pType) {
-  case LASSO:
-    problem = &Lasso<real_t>;
-    break;
-  // case LASSO_PATH:
-  //   problem = &LassoPath<real_t>;
-  //   break;
-  // case LOGISTIC:
-  //   problem = &Logistic<real_t>;
-  //   break;
-  // case LP_EQ:
-  //   problem = &LpEq<real_t>;
-  //   break;
-  // case LP_INEQ:
-  //   problem = &LpIneq<real_t>;
-  //   break;
-  // case NON_NEG_L2:
-  //   problem = &NonNegL2<real_t>;
-  //   break;
-  // case SVM:
-  //   problem = &Svm<real_t>;
-  //   break;
-  default:
-    problem = &ErrorProblem<real_t>;
-    break;
-  }
+  problem = ExampleFns[pType];
 
-  #ifdef _OPENMP
+#ifdef _OPENMP
   printf("openmp is working\n");
   printf("openmp max threads: %d\n", omp_get_max_threads());
-  #endif
+#endif
 
   ExampleData<real_t> data = problem(m, n, seed);
 

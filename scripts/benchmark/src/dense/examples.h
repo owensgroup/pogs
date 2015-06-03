@@ -7,6 +7,8 @@
 #include "pogs.h"
 #include "schedule.h"
 
+typedef double real_t;
+
 template <typename T>
 struct ExampleData {
   std::vector<T> A;
@@ -34,5 +36,24 @@ double NonNegL2(pogs::Schedule &s, size_t m, size_t n, int seed);
 template <typename T>
 double Svm(pogs::Schedule &s, size_t m, size_t n, int seed);
 */
+
+template<typename T>
+using GenFn = ExampleData<T> (*)(size_t m, size_t n, int seed);
+
+enum ProblemType {
+  LASSO
+  // LASSO_PATH,
+  // LOGISTIC,
+  // LP_EQ,
+  // LP_INEQ,
+  // NON_NEG_L2,
+  // SVM
+};
+
+GenFn<real_t> ExampleFns[] = {
+  &Lasso<real_t>
+};
+
+ProblemType GetProblemFn(std::string type);
 
 #endif  // EXAMPLES_H_

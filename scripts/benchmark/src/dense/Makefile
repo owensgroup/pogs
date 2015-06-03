@@ -3,7 +3,7 @@ POGSROOT=../../../../src
 CUDAROOT=/usr/local/cuda-6.5
 
 # Example Files
-EXSRC=lasso.cpp lasso_path.cpp logistic.cpp lp_eq.cpp lp_ineq.cpp nonneg_l2.cpp svm.cpp
+EXSRC=examples.cpp lasso.cpp lasso_path.cpp logistic.cpp lp_eq.cpp lp_ineq.cpp nonneg_l2.cpp svm.cpp
 
 LD_BOOST=-I/home/abpoms/boost/boost_1_57_0
 LIB_BOOST=-L/home/abpoms/boost/boost_1_57_0/stage/lib -lboost_program_options
