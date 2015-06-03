@@ -85,8 +85,6 @@ ExampleData<T> Lasso(size_t m, size_t n, int seed) {
     }
   }
 
-  MPI_Barrier(MPI_COMM_WORLD);
-
   std::vector<FunctionObj<T> > f;
   std::vector<FunctionObj<T> > g;
 
