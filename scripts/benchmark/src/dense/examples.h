@@ -50,9 +50,7 @@ enum ProblemType {
   // SVM
 };
 
-GenFn<real_t> ExampleFns[] = {
-  &Lasso<real_t>
-};
+extern const GenFn<real_t> ExampleFns[];
 
 ProblemType GetProblemFn(std::string type);
 

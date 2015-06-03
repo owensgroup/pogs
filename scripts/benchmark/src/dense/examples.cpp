@@ -2,6 +2,10 @@
 
 #include "examples.h"
 
+const GenFn<real_t> ExampleFns[] = {
+&Lasso<real_t>
+};
+
 template <typename T>
 ExampleData<T> ErrorProblem(size_t, size_t, int) {
   std::cerr << "Problem type invalid" << std::endl;
