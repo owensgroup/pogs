@@ -1,10 +1,11 @@
 #include <random>
 #include <vector>
 #include <cstdlib>
+#include <string>
 
 #include <mpi.h>
 
-#include "schedule.h"
+#include "examples.h"
 #include "matrix/matrix_dist_dense.h"
 #include "pogs.h"
 #include "timer.h"
@@ -15,7 +16,7 @@
 //
 // See <pogs>/matlab/examples/lasso.m for detailed description.
 template <typename T>
-double Lasso(size_t m, size_t n, int seed, std::string file) {
+ExampleData<T> Lasso(size_t m, size_t n, int seed) {
   std::vector<T> A;
   std::vector<T> b;
   T lambda_max;
@@ -99,11 +100,8 @@ double Lasso(size_t m, size_t n, int seed, std::string file) {
       g.emplace_back(kAbs, static_cast<T>(0.2) * lambda_max);
   }
 
-  double t = timer<double>();
-  SaveMatrix(A.data(), f, g, file);
-
-  return timer<double>() - t;
+  return {A, f, g};
 }
 
-template double Lasso<double>(size_t m, size_t n, int seed, std::string file);
-template double Lasso<float>(size_t m, size_t n, int seed, std::string file);
+template ExampleData<double> Lasso<double>(size_t m, size_t n, int seed);
+template ExampleData<float> Lasso<float>(size_t m, size_t n, int seed);

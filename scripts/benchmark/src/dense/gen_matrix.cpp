@@ -18,7 +18,7 @@
 typedef double real_t;
 
 template<typename T>
-using GenFn = double (*)(size_t m, size_t n, int seed, std::string file);
+using GenFn = ExampleData<T> (*)(size_t m, size_t n, int seed);
 
 enum ProblemType {
   LASSO
@@ -31,10 +31,10 @@ enum ProblemType {
 };
 
 template <typename T>
-double ErrorProblem(size_t, size_t, int, std::string) {
+ExampleData<T> ErrorProblem(size_t, size_t, int) {
   std::cerr << "Problem type invalid" << std::endl;
   std::exit(EXIT_FAILURE);
-  return 0.0;
+  return {};
 }
 
 int main(int argc, char **argv) {
@@ -144,12 +144,11 @@ int main(int argc, char **argv) {
   printf("openmp max threads: %d\n", omp_get_max_threads());
   #endif
 
-  double ret = problem(m, n, seed, out);
-  if (ret != -1) {
-      ret = 0;
-  }
+  ExampleData<real_t> data = problem(m, n, seed);
+
+  SaveMatrix(data.A.data(), data.f, data.g, out);
 
   MPI_Finalize();
 
-  return static_cast<int>(ret);
+  return 0;
 }
