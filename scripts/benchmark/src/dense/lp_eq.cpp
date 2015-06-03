@@ -5,6 +5,7 @@
 #include "pogs.h"
 #include "timer.h"
 #include "util.h"
+#include "example.h"
 
 // Linear program in equality form.
 //   minimize    c^T * x
