@@ -3,7 +3,7 @@
         "multi_dense" : {
             "arg_template":
             "--seed {seed} --type {typ} --m {m} --n {n}",
-            "directory": "~/repos/pogs/examples/cpp_m/"
+            "directory": "~/repos/pogs/scripts/benchmark/src/dense/"
         },
         "single_dense" : {
             "arg_template":

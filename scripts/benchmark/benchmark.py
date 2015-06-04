@@ -206,7 +206,7 @@ def main(args):
     tprint('Building test code')
     plan = process_plan_spec(plan_spec, config)
 
-    if len(args.matrix) > 0:
+    if args.matrix:
         tprint('Running plan with saved matrix')
         test_results = run_plan(plan, config)
     else:
