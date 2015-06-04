@@ -78,7 +78,8 @@ def cleanup_matrix_job(test_name, params, job_ids):
     return p.communicate().readline()
 
 
-def run_job(spec_file, config_name, config, test_name, param_num, gen_job_id):
+def run_job_file(spec_file, config_name, config, test_name, param_num,
+                 gen_job_id):
     test_resources = '-l {resources} -l walltime=24:00:00'
     test_resources.format(resources=config['resources'])
     depend_on = '-W depend=afterok:{matrix_id}'
@@ -92,8 +93,20 @@ def run_job(spec_file, config_name, config, test_name, param_num, gen_job_id):
     return p.communicate().readline()
 
 
+def run_job_memory(spec_file, config_name, config, test_name):
+    test_resources = '-l {resources} -l walltime=24:00:00'
+    test_resources.format(resources=config['resources'])
+    misc = test_resources
+    job_plan = config_name + ':' + test_name
+    results_file = job_plan.replace(':', '_') + 'results.json'
+    args = '--spec {spec} --plan {plan} --results {results}'
+    args = args.format(spec=spec_file, plan=job_plan, results=results_file)
+    p = qsub(config_name, 'run_job_memory.sh', args, misc)
+    return p.communicate().readline()
+
+
 #
-def launch_jobs(spec_file, plan, config):
+def launch_jobs_file(spec_file, plan, config):
     configs = config['configs']
     tests = config['tests']
 
@@ -107,12 +120,12 @@ def launch_jobs(spec_file, plan, config):
             run_job_ids = []
             for config_name in configurations:
                 config = configs[config_name]
-                job_id = run_job(spec_file,
-                                 config_name,
-                                 config,
-                                 test_name,
-                                 param_num,
-                                 gen_job_id)
+                job_id = run_job_file(spec_file,
+                                      config_name,
+                                      config,
+                                      test_name,
+                                      param_num,
+                                      gen_job_id)
 
                 run_job_ids.append(job_id)
             # cleanup matrix
@@ -121,6 +134,22 @@ def launch_jobs(spec_file, plan, config):
         # Finish up after a single test
     # Finish up after all tests
     p = qsub()
+
+
+def launch_jobs_memory(spec_file, plan, config):
+    configs = config['configs']
+    tests = config['tests']
+
+    for test_name, configurations in plan.iteritems():
+        if not test_name in tests:
+            tprint('Test', test_name, 'not in tests')
+            continue
+        for config_name in configurations:
+            config = configs[config_name]
+            run_job_memory(spec_file,
+                           config_name,
+                           config,
+                           test_name)
 
 
 def main(args):

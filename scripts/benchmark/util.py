@@ -24,3 +24,18 @@ def gen_matrix_filename(test_name, params):
     return '{test}_{m}_{n}'.format(test=test_name,
                                    m=params['m'],
                                    n=params['n'])
+
+
+# Plan arg
+def parse_plan_arg(plan_arg):
+    plan_spec = {}
+    for pair in plan_arg.split(';'):
+        pars = pair.split(':')
+        test = pars[0]
+        configs = pars[1].split(',')
+        plan_spec[test] = configs
+    return plan_spec
+
+
+def parse_plan_file(plan_file):
+    pass

@@ -89,8 +89,8 @@ def run_plan(plan, config):
 
     config_info = configs[config_name]
     config_solver = solvers[config_info['solver']]
-    tprint('Running ', config_name, ' for ', test_name,
-           ' for param num', param_num)
+    tprint('Running', config_name, 'for', test_name,
+           'for param num', param_num)
 
     test_info = tests[test_name]
     param = test_info['params'][param_num]
@@ -98,6 +98,7 @@ def run_plan(plan, config):
     param['typ'] = test_info['type']
     args = config_solver['arg_template'].format(**param)
     cmd = config_info['run'] + ' ' + args
+
     tprint('Running test with run cmd:', cmd)
     p = subprocess.Popen(
         cmd,
@@ -106,7 +107,7 @@ def run_plan(plan, config):
         stderr=subprocess.PIPE,
         shell=True
     )
-    tout = 60 * 60
+    tout = 3 * 60 * 60
     try:
         sout, serr = p.communicate(timeout=tout)
     except subprocess.TimeoutExpired:
@@ -125,6 +126,58 @@ def run_plan(plan, config):
         }
     plan_results[config_name][test_name].append(result)
     tprint('Finished test')
+    return plan_results
+
+
+def run_plan_memory(plan, config):
+    global plan_results
+    plan_results = defaultdict(lambda: defaultdict(list))
+
+    solvers = config['solvers']
+    configs = config['configs']
+    tests = config['tests']
+
+    for config_name, test_names in plan.iteritems():
+        test_name = test_names[0]
+
+        tprint('Running', config_name, 'for', test_name)
+        config_info = configs[config_name]
+        config_solver = solvers[config_info['solver']]
+        test_info = tests[test_name]
+
+        for param in test_info['params']:
+            param['seed'] = 1000
+            param['typ'] = test_info['type']
+            args = config_solver['arg_template'].format(**param)
+            cmd = config_info['run'] + ' ' + args
+
+            tprint('Running test with run cmd:', cmd)
+            p = subprocess.Popen(
+                cmd,
+                cwd=config_solver['directory'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                shell=True
+            )
+            tout = 3 * 60 * 60
+            try:
+                sout, serr = p.communicate(timeout=tout)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                tprint('Task timed out after', tout, 'seconds')
+                sout, serr = p.communicate()
+            if p.returncode == 0:
+                tprint('Finished task')
+                result = parse_solver_output(sout, serr)
+            else:
+                tprint('Error in task, return code:',
+                       str(p.returncode))
+                result = {
+                    'out': sout,
+                    'err': serr
+                }
+            plan_results[config_name][test_name].append(result)
+        tprint('Finished test')
     return plan_results
 
 
@@ -153,7 +206,12 @@ def main(args):
     tprint('Building test code')
     plan = process_plan_spec(plan_spec, config)
 
-    test_results = run_plan(plan, config)
+    if len(args.matrix) > 0:
+        tprint('Running plan with saved matrix')
+        test_results = run_plan(plan, config)
+    else:
+        tprint('Running plan with saved matrix')
+        test_results = run_plan_memory(plan, config)
     tprint('Saving results to', args.results)
 
     with open(args.results, 'w') as results_fo:
@@ -177,6 +235,7 @@ if __name__ == '__main__':
     parser.add_argument('--spec', nargs='?', default='spec.json')
     parser.add_argument('--results', nargs='?', default='results.json')
     parser.add_argument('--plan', nargs='?')
+    parser.add_argument('--matrix', nargs='?')
     parser.add_argument('--plan_file', nargs='?')
     cmd_args = parser.parse_args()
     main(cmd_args)
