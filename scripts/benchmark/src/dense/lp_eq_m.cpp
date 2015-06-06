@@ -60,9 +60,9 @@ ExampleData<T> LpEqM(size_t m, size_t n, int seed) {
       }
     }
 
-    size_t c_start = real_m * n - 1;
+    size_t c_start = (real_m - 1) * n;
+    size_t c_size = (n / NUM_BLOCKS);
     for (size_t i = 0; i < NUM_BLOCKS - 1; ++i) {
-      size_t c_size = (n / NUM_BLOCKS);
       size_t c_offset = c_size * (i - 1);
       size_t row = (m / NUM_BLOCKS) * i + i;
       for (size_t j = 0; j < n; ++j) {
