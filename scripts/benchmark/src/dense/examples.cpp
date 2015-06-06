@@ -3,7 +3,8 @@
 #include "examples.h"
 
 const GenFn<real_t> ExampleFns[] = {
-&Lasso<real_t>
+  &Lasso<real_t>,
+  &LpEqM<real_t>
 };
 
 template <typename T>
@@ -19,6 +20,8 @@ ProblemType GetProblemFn(std::string type){
 
   if (type == "lasso") {
     pType = LASSO;
+  } else if (type == "lp_eq_m") {
+    pType = LP_EQ_M;
     // } else if (typ == "lasso_path") {
     //   pType = LASSO_PATH;
     // } else if (typ == "logistic") {

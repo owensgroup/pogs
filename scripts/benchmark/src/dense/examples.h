@@ -18,6 +18,9 @@ struct ExampleData {
 template <typename T>
 ExampleData<T> Lasso(size_t m, size_t n, int seed);
 
+template <typename T>
+ExampleData<T> LpEqM(size_t m, size_t n, int seed);
+
 /* template <typename T>
 double LassoPath(pogs::Schedule &s, size_t m, size_t n, int seed);
 
@@ -41,7 +44,8 @@ template<typename T>
 using GenFn = ExampleData<T> (*)(size_t m, size_t n, int seed);
 
 enum ProblemType {
-  LASSO
+  LASSO,
+  LP_EQ_M
   // LASSO_PATH,
   // LOGISTIC,
   // LP_EQ,

@@ -105,6 +105,8 @@ int main(int argc, char **argv) {
       data = problem(m, n, seed);
       printf("time to gen matrix: %.3e\n", timer<double>() - t0);
     }
+    m = data.f.size();
+    n = data.g.size();
   }
 
   MPI_Bcast(&m, 1, MPI_INT, 0, MPI_COMM_WORLD);
