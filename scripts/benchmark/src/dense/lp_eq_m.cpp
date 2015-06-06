@@ -1,5 +1,6 @@
 #include <random>
 #include <vector>
+#include <omp.h>
 
 #include "matrix/matrix_dist_dense.h"
 #include "pogs.h"
@@ -7,7 +8,7 @@
 #include "util.h"
 #include "examples.h"
 
-#define NUM_BLOCKS 4
+#define NUM_BLOCKS 2
 
 // Linear program in equality form.
 //   minimize    c^T * x
@@ -46,25 +47,34 @@ ExampleData<T> LpEqM(size_t m, size_t n, int seed) {
     //   A = 1 / n * rand(m, n)
     //   c = 1 / n * rand(n, 1)
 
+    printf("before a\n");
 #ifdef _OPENMP
 #pragma omp parallel for num_threads(NUM_RANDS)
 #endif
     for (int i = 0; i < NUM_RANDS; ++i) {
       size_t thread_m = real_m  / NUM_RANDS;
-      size_t offset = (thread_m * i) * n;
-      for (size_t j = 0; i < n * thread_m; ++i) {
-        size_t row = (offset + j) / n ;
-        if (row + 1 % (real_m / NUM_BLOCKS) == 0 && row != real_m - 1)
+      size_t offset_row = (thread_m * i);
+      size_t offset = offset_row * n;
+      for (size_t j = 0; j < n * thread_m; ++j) {
+        size_t current_row = j / n;
+        if (current_row + 1 % (real_m / NUM_BLOCKS) == 0) {
           continue;
+        }
         A[offset + j] = u_dist[i](generator[i]) / static_cast<T>(n);
       }
     }
 
     size_t c_start = (real_m - 1) * n;
+    for (size_t j = 0; j < n; ++j) {
+      A[c_start + j] = u_dist[NUM_RANDS - 1](generator[NUM_RANDS - 1])
+        / static_cast<T>(n);
+    }
+
+    printf("before c_start\n");
     size_t c_size = (n / NUM_BLOCKS);
     for (size_t i = 0; i < NUM_BLOCKS - 1; ++i) {
-      size_t c_offset = c_size * (i - 1);
-      size_t row = (m / NUM_BLOCKS) * i + i;
+      size_t c_offset = c_size * i;
+      size_t row = (real_m / NUM_BLOCKS) * (i+1) - 1;
       for (size_t j = 0; j < n; ++j) {
         A[row * n + j] = 0;
       }
