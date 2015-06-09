@@ -95,4 +95,31 @@ void LoadMatrix(std::string filename,
   fclose(pFile);
 }
 
+
+template <typename T>
+void PrintMatrix(T *a,
+                 std::vector<FunctionObj<T> > &f,
+                 std::vector<FunctionObj<T> > &g) {
+
+  using size_type = typename std::vector<FunctionObj<T> >::size_type;
+  printf("     ");
+  for (size_type i = 0; i < g.size(); ++i) {
+    printf("%9d ", i);
+  }
+  printf("\n");
+  printf("     ");
+  for (size_type i = 0; i < g.size(); ++i) {
+    printf("%9d ", g[i].h);
+  }
+  printf("\n");
+  for (size_type i = 0; i < f.size(); ++i) {
+    printf("%2d %d ", i, f[i].h);
+    size_t offset = i * g.size();
+    for (size_type j = 0; j < g.size(); ++j) {
+      printf("%.3e ", a[offset + j]);
+    }
+    printf("\n");
+  }
+}
+
 #endif
