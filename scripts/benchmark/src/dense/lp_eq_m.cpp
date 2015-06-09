@@ -57,7 +57,7 @@ ExampleData<T> LpEqM(size_t m, size_t n, int seed) {
       size_t offset = offset_row * n;
       for (size_t j = 0; j < n * thread_m; ++j) {
         size_t current_row = j / n;
-        if (current_row + 1 % (real_m / NUM_BLOCKS) == 0) {
+        if ((current_row + 1) % (real_m / NUM_BLOCKS) == 0) {
           continue;
         }
         A[offset + j] = u_dist[i](generator[i]) / static_cast<T>(n);
@@ -93,13 +93,14 @@ ExampleData<T> LpEqM(size_t m, size_t n, int seed) {
 
     f.reserve(real_m);
     for (unsigned int i = 0; i < real_m; ++i) {
-      if (i + 1 % (real_m / NUM_BLOCKS) == 0) {
+      if ((i + 1) % (real_m / NUM_BLOCKS) == 0) {
         f.emplace_back(kIdentity);
+      } else {
+        T b_i = static_cast<T>(0);
+        for (unsigned int j = 0; j < n; ++j)
+          b_i += A[i * n + j] * v[j];
+        f.emplace_back(kIndEq0, static_cast<T>(1), b_i);
       }
-      T b_i = static_cast<T>(0);
-      for (unsigned int j = 0; j < n; ++j)
-        b_i += A[i * n + j] * v[j];
-      f.emplace_back(kIndEq0, static_cast<T>(1), b_i);
     }
 
     g.reserve(n);
