@@ -33,6 +33,6 @@
         { "block": { "row": 28, "column": 0 }, "gpu_indicies": [4] },
         { "block": { "row": 29, "column": 0 }, "gpu_indicies": [5] },
         { "block": { "row": 30, "column": 0 }, "gpu_indicies": [0] },
-        { "block": { "row": 31, "column": 0 }, "gpu_indicies": [0] }
+        { "block": { "row": 31, "column": 0 }, "gpu_indicies": [1] }
     ]
 }
