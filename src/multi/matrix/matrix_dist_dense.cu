@@ -445,8 +445,8 @@ void DistributeBlocks(const Schedule &s,
           size_t size = block.Cols();
           if (kRank == node) {
             size_t gpu_offset = (row - block.row_begin) * block.Cols();
-            cudaMemcpy(gpu_data + offset, orig_data + offset, size * sizeof(T),
-                       cudaMemcpyDefault);
+            cudaMemcpy(gpu_data + gpu_offset, orig_data + offset,
+                       size * sizeof(T), cudaMemcpyDefault);
           } else {
             MPI_Isend(orig_data + offset, size * sizeof(T), MPI_BYTE, node, 0,
                       MPI_COMM_WORLD, &request[node - 1]);
