@@ -479,12 +479,15 @@ void DistributeBlocks(const Schedule &s,
 
     size_t rows = block.row_end - block.row_begin;
     size_t columns = block.column_end - block.column_begin;
+
+    T *temp_data = new T[rows * columns];
+    
     if (ord == MatrixDistDense<T>::ROW) {
       for (size_t row = 0; row < rows; ++row) {
         size_t offset = row * columns;
         size_t size = columns;
         // MPI
-        MPI_Recv(gpu_data + offset, size * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
+        MPI_Recv(temp_data + offset, size * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
                  MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       }
     } else {
@@ -492,10 +495,13 @@ void DistributeBlocks(const Schedule &s,
         size_t offset = col * rows;
         size_t size = rows;
         // MPI
-        MPI_Recv(gpu_data + offset, size * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
+        MPI_Recv(temp_data + offset, size * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
                  MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       }
     }
+
+    cudaMemcpy(gpu_data, temp_data, size * sizeof(T), cudaMemcpyDefault);
+    delete [] temp_data;
   }
 
   MASTER(kRank) {
