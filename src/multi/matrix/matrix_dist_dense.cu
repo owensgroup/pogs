@@ -500,7 +500,8 @@ void DistributeBlocks(const Schedule &s,
       }
     }
 
-    cudaMemcpy(gpu_data, temp_data, size * sizeof(T), cudaMemcpyDefault);
+    cudaMemcpy(gpu_data, temp_data, rows * columns * sizeof(T),
+               cudaMemcpyDefault);
     delete [] temp_data;
   }
 
