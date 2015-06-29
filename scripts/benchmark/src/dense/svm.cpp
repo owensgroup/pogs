@@ -5,6 +5,7 @@
 #include "pogs.h"
 #include "timer.h"
 #include "util.h"
+#include "examples.h"
 
 using namespace pogs;
 
@@ -13,8 +14,11 @@ using namespace pogs;
 //
 // See <pogs>/matlab/examples/svm.m for detailed description.
 template <typename T>
-double Svm(pogs::Schedule &s, size_t m, size_t n, int seed) {
+ExampleData<T> Svm(pogs::Schedule &s, size_t m, size_t n, int seed) {
   std::vector<T> A;
+
+  std::vector<FunctionObj<T> > f;
+  std::vector<FunctionObj<T> > g;
 
   int kRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
@@ -42,11 +46,6 @@ double Svm(pogs::Schedule &s, size_t m, size_t n, int seed) {
     }
   }
 
-  pogs::MatrixDistDense<T> A_(s, 'r', m, n + 1, A.data());
-  pogs::PogsDirect<T, pogs::MatrixDistDense<T> > pogs_data(A_);
-  std::vector<FunctionObj<T> > f;
-  std::vector<FunctionObj<T> > g;
-
   MASTER(kRank) {
     T lambda = static_cast<T>(1);
 
@@ -61,11 +60,10 @@ double Svm(pogs::Schedule &s, size_t m, size_t n, int seed) {
     g.emplace_back(kZero);
   }
 
-  double t = timer<double>();
-  pogs_data.Solve(f, g);
-
-  return timer<double>() - t;
+  return {A, f, g};
 }
 
-template double Svm<double>(pogs::Schedule &s, size_t m, size_t n, int seed);
-template double Svm<float>(pogs::Schedule &s, size_t m, size_t n, int seed);
+template ExampleData<double> Svm<double>(pogs::Schedule &s, size_t m, size_t n,
+                                         int seed);
+template ExampleData<float> Svm<float>(pogs::Schedule &s, size_t m, size_t n,
+                                       int seed);

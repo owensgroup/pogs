@@ -14,7 +14,7 @@
 //
 // See <pogs>/matlab/examples/lp_eq.m for detailed description.
 template <typename T>
-ExampleData<T> LpEq(size_t m, size_t n, int seed) {
+ExampleData<T> LpEq(pogs::Schedule &s, size_t m, size_t n, int seed) {
   std::vector<T> A;
 
   std::vector<FunctionObj<T> > f;
@@ -78,5 +78,7 @@ ExampleData<T> LpEq(size_t m, size_t n, int seed) {
   return {A, f, g};
 }
 
-template ExampleData<double> LpEq<double>(size_t m, size_t n, int seed);
-template ExampleData<float> LpEq<float>(size_t m, size_t n, int seed);
+template ExampleData<double> LpEq<double>(pogs::Schedule &s, size_t m, size_t n,
+                                          int seed);
+template ExampleData<float> LpEq<float>(pogs::Schedule &s, size_t m, size_t n,
+                                        int seed);

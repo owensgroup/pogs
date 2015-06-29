@@ -1,14 +1,11 @@
 #include <random>
 #include <vector>
-#include <omp.h>
 
 #include "matrix/matrix_dist_dense.h"
 #include "pogs.h"
 #include "timer.h"
 #include "util.h"
 #include "examples.h"
-
-#define NUM_BLOCKS 2
 
 // Linear program in equality form.
 //   minimize    c^T * x
@@ -17,7 +14,8 @@
 //
 // See <pogs>/matlab/examples/lp_eq.m for detailed description.
 template <typename T>
-ExampleData<T> LpEqM(size_t m, size_t n, int seed) {
+ExampleData<T> LpEqM(pogs::Schedule &s, size_t m, size_t n, int seed) {
+  int NUM_BLOCKS = s.MBlocks();
   std::vector<T> A;
 
   std::vector<FunctionObj<T> > f;
@@ -111,5 +109,8 @@ ExampleData<T> LpEqM(size_t m, size_t n, int seed) {
   return {A, f, g};
 }
 
-template ExampleData<double> LpEqM<double>(size_t m, size_t n, int seed);
-template ExampleData<float> LpEqM<float>(size_t m, size_t n, int seed);
+template ExampleData<double> LpEqM<double>(pogs::Schedule &s, size_t m,
+                                           size_t n,
+                                           int seed);
+template ExampleData<float> LpEqM<float>(pogs::Schedule &s, size_t m, size_t n,
+                                         int seed);

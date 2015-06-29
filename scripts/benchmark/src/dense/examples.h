@@ -16,19 +16,19 @@ struct ExampleData {
 };
 
 template <typename T>
-ExampleData<T> Lasso(size_t m, size_t n, int seed);
+ExampleData<T> Lasso(pogs::Schedule &s, size_t m, size_t n, int seed);
 
 template <typename T>
-ExampleData<T> LpEqM(size_t m, size_t n, int seed);
+ExampleData<T> LpEq(pogs::Schedule &s, size_t m, size_t n, int seed);
+
+template <typename T>
+ExampleData<T> LpEqM(pogs::Schedule &s, size_t m, size_t n, int seed);
 
 /* template <typename T>
 double LassoPath(pogs::Schedule &s, size_t m, size_t n, int seed);
 
 template <typename T>
 double Logistic(pogs::Schedule &s, size_t m, size_t n, int seed);
-
-template <typename T>
-double LpEq(pogs::Schedule &s, size_t m, size_t n, int seed);
 
 template <typename T>
 double LpIneq(pogs::Schedule &s, size_t m, size_t n, int seed);
@@ -41,14 +41,15 @@ double Svm(pogs::Schedule &s, size_t m, size_t n, int seed);
 */
 
 template<typename T>
-using GenFn = ExampleData<T> (*)(size_t m, size_t n, int seed);
+using GenFn = ExampleData<T> (*)(pogs::Schedule &s, size_t m, size_t n,
+                                 int seed);
 
 enum ProblemType {
   LASSO,
+  LP_EQ,
   LP_EQ_M
   // LASSO_PATH,
   // LOGISTIC,
-  // LP_EQ,
   // LP_INEQ,
   // NON_NEG_L2,
   // SVM

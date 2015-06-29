@@ -4,11 +4,12 @@
 
 const GenFn<real_t> ExampleFns[] = {
   &Lasso<real_t>,
+  &LpEq<real_t>,
   &LpEqM<real_t>
 };
 
 template <typename T>
-ExampleData<T> ErrorProblem(size_t, size_t, int) {
+ExampleData<T> ErrorProblem(pogs::Schedule&, size_t, size_t, int) {
   std::cerr << "Problem type invalid" << std::endl;
   std::exit(EXIT_FAILURE);
   return {};
@@ -20,14 +21,14 @@ ProblemType GetProblemFn(std::string type){
 
   if (type == "lasso") {
     pType = LASSO;
+  } else if (type == "lp_eq") {
+    pType = LP_EQ;
   } else if (type == "lp_eq_m") {
     pType = LP_EQ_M;
     // } else if (typ == "lasso_path") {
     //   pType = LASSO_PATH;
     // } else if (typ == "logistic") {
     //   pType = LOGISTIC;
-    // } else if (typ == "lp_eq") {
-    //   pType = LP_EQ;
     // } else if (typ == "lp_ineq") {
     //   pType = LP_INEQ;
     // } else if (typ == "non_neg_l2") {

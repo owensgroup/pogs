@@ -92,7 +92,16 @@ int main(int argc, char **argv) {
     std::ifstream sched_fs (schedule_file, std::fstream::in);
     sched_string = std::string((std::istreambuf_iterator<char>(sched_fs)),
                                std::istreambuf_iterator<char>());
+  }
 
+  MPI_Bcast(&m, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&seed, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  BcastString(sched_string);
+
+  Schedule sched = parse_schedule(sched_string.data(), m, n);
+
+  MASTER(kRank) {
     if (matrix_file.size() > 0) {
       real_t *a;
       LoadMatrix(matrix_file, &a, data.f, data.g);
@@ -102,22 +111,13 @@ int main(int argc, char **argv) {
       ProblemType pType = GetProblemFn(typ);
       GenFn<real_t> problem = ExampleFns[pType];
       double t0 = timer<double>();
-      data = problem(m, n, seed);
+      data = problem(sched, m, n, seed);
       printf("time to gen matrix: %.3e\n", timer<double>() - t0);
     }
     m = data.f.size();
     n = data.g.size();
   }
 
-  MPI_Bcast(&m, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(&seed, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-
-  // Sched
-  BcastString(sched_string);
-
-  Schedule sched = parse_schedule(sched_string.data(), m, n);
 
   pogs::MatrixDistDense<real_t> A_(sched, 'r', m, n, data.A.data());
   pogs::PogsDirect<real_t, pogs::MatrixDistDense<real_t> > pogs_data(A_);

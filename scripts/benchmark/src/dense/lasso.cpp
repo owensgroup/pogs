@@ -16,7 +16,7 @@
 //
 // See <pogs>/matlab/examples/lasso.m for detailed description.
 template <typename T>
-ExampleData<T> Lasso(size_t m, size_t n, int seed) {
+ExampleData<T> Lasso(pogs::Schedule &s, size_t m, size_t n, int seed) {
   std::vector<T> A;
   std::vector<T> b;
   T lambda_max;
@@ -101,5 +101,8 @@ ExampleData<T> Lasso(size_t m, size_t n, int seed) {
   return {A, f, g};
 }
 
-template ExampleData<double> Lasso<double>(size_t m, size_t n, int seed);
-template ExampleData<float> Lasso<float>(size_t m, size_t n, int seed);
+template ExampleData<double> Lasso<double>(pogs::Schedule &s, size_t m,
+                                           size_t n,
+                                           int seed);
+template ExampleData<float> Lasso<float>(pogs::Schedule &s, size_t m, size_t n,
+                                         int seed);
