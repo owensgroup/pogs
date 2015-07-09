@@ -182,13 +182,24 @@ void SinkhornKnopp(cublasHandle_t hdl, const MatrixDist<T> *A, T *d, T *e) {
   MPI_Datatype t_type = (is_same<T,double>::value ?
                          MPI_DOUBLE :
                          MPI_FLOAT);
+  int kRank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
 
   const BlockMeta &block = A->Meta().block;
 
+  printf("%d before comm splits\n", kRank);
   MPI_Comm row_comm, col_comm;
-  MPI_Comm_split(MPI_COMM_WORLD, block.row, 0, &row_comm);
-  MPI_Comm_split(MPI_COMM_WORLD, block.column, 0, &col_comm);
+  //MPI_Comm_split(MPI_COMM_WORLD, block.row, 0, &row_comm);
+  MPI_Comm_dup(MPI_COMM_SELF, &row_comm);
+  printf("%d after row splits\n", kRank);
+  //MPI_Comm_split(MPI_COMM_WORLD, block.column, 0, &col_comm);
+  MPI_Comm_dup(MPI_COMM_WORLD, &col_comm);
+  printf("%d before col splits\n", kRank);
+  int row_size, col_size;
+  MPI_Comm_size(row_comm, &row_size);
+  MPI_Comm_size(col_comm, &col_size);
 
+  printf("%d after comm splits\n", kRank);
   cml::vector<T> d_vec = cml::vector_view_array<T>(d, block.Rows());
   cml::vector<T> e_vec = cml::vector_view_array<T>(e, block.Cols());
   cml::vector_set_all(&d_vec, static_cast<T>(1.));

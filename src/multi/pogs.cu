@@ -182,8 +182,13 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
 
   // Average comm
   MPI_Comm avg_comm, exch_comm;
-  MPI_Comm_split(MPI_COMM_WORLD, block.column, 0, &avg_comm);
-  MPI_Comm_split(MPI_COMM_WORLD, block.row, 0, &exch_comm);
+  printf("%d before main splits\n", kRank);
+  //MPI_Comm_split(MPI_COMM_WORLD, block.row, 0, &exch_comm);
+  MPI_Comm_dup(MPI_COMM_SELF, &exch_comm);
+  printf("%d after exch splits\n", kRank);
+  //MPI_Comm_split(MPI_COMM_WORLD, block.column, 0, &avg_comm);
+  MPI_Comm_dup(MPI_COMM_WORLD, &avg_comm);
+  printf("%d after avg splits\n", kRank);
 
   // Initialize Projector P and Matrix A.
   if (!_done_init)
