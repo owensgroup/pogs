@@ -33,8 +33,12 @@ T dist_blas_dot(cublasHandle_t handle,
                 const cml::vector<T> *x, const cml::vector<T> *y) {
   T norm2;
   cml::blas_dot(handle, x, y, &norm2);
-  MPI_Allreduce(MPI_IN_PLACE, &norm2, 1, MPIDTypeFromT<T>(), MPI_SUM,
+  T tempNorm2;
+  cudaDeviceSynchronize();
+  MPI_Allreduce(&norm2, &tempNorm2, 1, MPIDTypeFromT<T>(), MPI_SUM,
                 MPI_COMM_WORLD);
+  norm2 = tempNorm2;
+  cudaDeviceSynchronize();
   return norm2;
 }
 

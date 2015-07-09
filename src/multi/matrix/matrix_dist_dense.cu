@@ -191,20 +191,26 @@ int MatrixDistDense<T>::Mul(char trans, T alpha, const T *x, T beta, T *y)
   BlockMul(trans, alpha, x_vec_block.data, beta, y_vec_block.data);
   if (OpToCublasOp(trans) == CUBLAS_OP_N) {
     // Sum partial components
+    cudaDeviceSynchronize();
     MPI_Allreduce(MPI_IN_PLACE, y_vec_block.data, y_vec_block.size, t_type,
                   MPI_SUM, col_comm);
+    cudaDeviceSynchronize();
     // Compose components
     MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
                   y_vec.data, y_vec.size, t_type,
                   row_comm);
+    cudaDeviceSynchronize();
   } else {
     // Sum partial components
+    cudaDeviceSynchronize();
     MPI_Allreduce(MPI_IN_PLACE, y_vec_block.data, y_vec_block.size, t_type,
                   MPI_SUM, row_comm);
+    cudaDeviceSynchronize();
     // Compose components
     MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
                   y_vec.data, y_vec.size, t_type,
                   col_comm);
+    cudaDeviceSynchronize();
   }
 
   CUDA_CHECK_ERR();
@@ -331,8 +337,10 @@ int MatrixDistDense<T>::Equil(T *d, T *e) {
   int kRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
 
+  cudaDeviceSynchronize();
   T normD = mpih::dist_blas_nrm2(hdl, &d_vec);
-  T normE = mpih::dist_blas_nrm2(hdl, &e_vec);
+  T normE = cml::blas_nrm2(hdl, &e_vec);
+  cudaDeviceSynchronize();
   MASTER(kRank) {
     BMARK_PRINT_T("equil_time", timer<double>() - t0);
     DEBUG_PRINTF("norm A = %e, normd = %e, norme = %e\n", normA, normD, normE);
@@ -368,7 +376,9 @@ T NormEst(cublasHandle_t hdl, NormTypes norm_type,
           block.Rows() * block.Cols());
       T norm2;
       cml::blas_dot(hdl, &a, &a, &norm2);
+      cudaDeviceSynchronize();
       MPI_Allreduce(MPI_IN_PLACE, &norm2, 1, t_type, MPI_SUM, MPI_COMM_WORLD);
+      cudaDeviceSynchronize();
       norm2 = sqrtf(norm2);
       return norm2 / std::sqrt(std::min(A.Rows(), A.Cols()));
     }

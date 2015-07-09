@@ -405,6 +405,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
         _verbose > 1 && converged) {
       T optval = FuncEval(f_gpu, y12.data);
       MPI_Allreduce(MPI_IN_PLACE, &optval, 1, t_type, MPI_SUM, MPI_COMM_WORLD);
+      cudaDeviceSynchronize();
 
       // Unscale
       thrust::transform(g_gpu.begin(), g_gpu.end(),
@@ -469,13 +470,16 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     MASTER(kRank) {
       mpih::Reduce(hdl, x_avg.data, x_avg_temp.data, x_avg.size, MPI_SUM, 0,
                    MPI_COMM_WORLD);
+      cudaDeviceSynchronize();
       cml::vector_memcpy(&x_avg, &x_avg_temp);
       cml::blas_scal(hdl, 1.0 / _A.GetSchedule().MBlocks(), &x_avg);
     } else {
       mpih::Reduce(hdl, x_avg.data, x_avg.data, x_avg.size, MPI_SUM, 0,
                    MPI_COMM_WORLD);
+      cudaDeviceSynchronize();
     }
     MPI_Bcast(x_avg.data, x_avg.size, t_type, 0, MPI_COMM_WORLD);
+    cudaDeviceSynchronize();
   }
 
   // Reverse division by number of M blocks so we can compute global opt value

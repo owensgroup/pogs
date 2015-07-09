@@ -141,22 +141,32 @@ T Norm2Est(cublasHandle_t hdl, const MatrixDist<T> *A) {
     cudaDeviceSynchronize();
     // Reduce local matrix mults by summing partial column products together
     mpih::Allreduce(hdl, Sx.data, Sx_temp.data, Sx.size, MPI_SUM, Sx_comm);
+    cudaDeviceSynchronize();
     cml::vector_memcpy(&Sx, &Sx_temp);
 
     A->BlockMul('t', static_cast<T>(1.), Sx.data, static_cast<T>(0.), x.data);
     cudaDeviceSynchronize();
     // Reduce local matrix mults by summing partial column products together
     mpih::Allreduce(hdl, x.data, x_temp.data, x.size, MPI_SUM, x_comm);
+    cudaDeviceSynchronize();
     cml::vector_memcpy(&x, &x_temp);
 
     // Calculate global norms by collecting partial row norm values
     T normx;
     cml::blas_dot(hdl, &x, &x, &normx);
-    MPI_Allreduce(MPI_IN_PLACE, &normx, 1, t_type, MPI_SUM, Sx_comm);
+    cudaDeviceSynchronize();
+    T tempx;
+    MPI_Allreduce(&normx, &tempx, 1, t_type, MPI_SUM, Sx_comm);
+    cudaDeviceSynchronize();
+    normx = tempx;
     normx = sqrtf(normx);
     T normSx;
     cml::blas_dot(hdl, &Sx, &Sx, &normSx);
-    MPI_Allreduce(MPI_IN_PLACE, &normSx, 1, t_type, MPI_SUM, x_comm);
+    cudaDeviceSynchronize();
+    T tempSx;
+    MPI_Allreduce(&normSx, &tempSx, 1, t_type, MPI_SUM, x_comm);
+    cudaDeviceSynchronize();
+    normSx = tempSx;
     normSx = sqrtf(normSx);
 
     cml::vector_scale(&x, 1 / normx);
@@ -208,14 +218,19 @@ void SinkhornKnopp(cublasHandle_t hdl, const MatrixDist<T> *A, T *d, T *e) {
   cml::vector<T> d_vec_temp = cml::vector_calloc<T>(block.Rows());
   cml::vector<T> e_vec_temp = cml::vector_calloc<T>(block.Cols());
 
+  printf("%d before sinkhorn iterate\n", kRank);
   for (unsigned int k = 0; k < kEquilIter; ++k) {
     // e := 1 ./ (A' * d).
+    cudaDeviceSynchronize();
     A->BlockMul('t', static_cast<T>(1.), d, static_cast<T>(0.), e);
     cudaDeviceSynchronize();
     CUDA_CHECK_ERR();
-    mpih::Allreduce(hdl, e_vec.data, e_vec_temp.data, e_vec.size, MPI_SUM,
-                    col_comm);
-    cml::vector_memcpy(&e_vec, &e_vec_temp);
+    if (col_size > 1) {
+      mpih::Allreduce(hdl, e_vec.data, e_vec_temp.data, e_vec.size, MPI_SUM,
+                      col_comm);
+      cudaDeviceSynchronize();
+      cml::vector_memcpy(&e_vec, &e_vec_temp);
+    }
 
     cml::vector_add_constant(&e_vec,
         static_cast<T>(kSinkhornConst) * (A->Rows() + A->Cols()) / A->Rows());
@@ -231,9 +246,14 @@ void SinkhornKnopp(cublasHandle_t hdl, const MatrixDist<T> *A, T *d, T *e) {
     cudaDeviceSynchronize();
     CUDA_CHECK_ERR();
 
-    mpih::Allreduce(hdl, d_vec.data, d_vec_temp.data, d_vec.size, MPI_SUM,
-                    row_comm);
-    cml::vector_memcpy(&d_vec, &d_vec_temp);
+    // Must check size here because when RDMA is occuring the master node
+    // suffers a no op on this???
+    if (row_size > 1) {
+      mpih::Allreduce(hdl, d_vec.data, d_vec_temp.data, d_vec.size, MPI_SUM,
+                      row_comm);
+      cudaDeviceSynchronize();
+      cml::vector_memcpy(&d_vec, &d_vec_temp);
+    }
 
     cml::vector_add_constant(&d_vec,
         static_cast<T>(kSinkhornConst) * (A->Rows() + A->Cols()) / A->Cols());
