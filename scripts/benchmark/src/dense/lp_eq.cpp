@@ -50,7 +50,7 @@ ExampleData<T> LpEq(pogs::Schedule &s, size_t m, size_t n, int seed) {
     for (int i = 0; i < NUM_RANDS; ++i) {
       size_t thread_m = (m + 1) / NUM_RANDS;
       size_t offset = (thread_m * i) * n;
-      for (size_t j = 0; i < n * thread_m; ++i)
+      for (size_t j = 0; j < n * thread_m; ++j)
         A[offset + j] = u_dist[i](generator[i]) / static_cast<T>(n);
     }
 
