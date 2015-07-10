@@ -164,7 +164,7 @@ def main(args):
         plan_spec = parse_plan_arg(args.plan)
     plan = process_plan_spec(plan_spec, config)
 
-    launch_jobs(args.spec, plan, config)
+    launch_jobs_memory(args.spec, plan, config)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
