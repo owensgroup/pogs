@@ -21,6 +21,13 @@ cmd_args = None
 plan_results = None
 
 
+def build_arg_string(args):
+    arg = ''
+    for k, v in args.iteritems():
+        arg += ' --{key} {value}'.format(key=k, value=v)
+    return arg
+
+
 def process_config_spec(spec):
     # plan = defaultdict(list)
     # # Process solvers
@@ -147,8 +154,8 @@ def run_plan_memory(plan, config):
 
         for param in test_info['params']:
             param['seed'] = 1000
-            param['typ'] = test_info['type']
-            args = config_solver['arg_template'].format(**param)
+            param['type'] = test_info['type']
+            args = build_arg_string(param)
             cmd = config_info['run'] + ' ' + args
 
             tprint('Running test with run cmd:', cmd)
