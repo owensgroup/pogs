@@ -16,6 +16,7 @@
 #include "pogs.h"
 #include "matrix/matrix_dist_dense.h"
 #include "examples.h"
+#include "timer.h"
 
 
 void BcastString(std::string &s) {
