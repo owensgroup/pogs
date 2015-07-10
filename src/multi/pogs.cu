@@ -453,7 +453,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     T optval = static_cast<T>(0);
 #ifdef DEBUG
     if (true) {
-#elif
+#else
     if (_verbose > 2 && k % 10  == 0 ||
         _verbose > 1 && k % 100 == 0 ||
         _verbose > 1 && converged) {
