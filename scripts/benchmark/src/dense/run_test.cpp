@@ -45,6 +45,8 @@ int main(int argc, char **argv) {
   std::string sched_string;
   std::string matrix_file;
 
+  real_t abs_tol, rel_tol;
+
   int kRank;
 
   MPI_Init(&argc, &argv);
@@ -62,6 +64,10 @@ int main(int argc, char **argv) {
       ("type", po::value<std::string>(&typ), "Type of problem to run")
       ("schedule", po::value<std::string>(&schedule_file),
        "JSON file for schedule description")
+      ("abs_tol", po::value<real_t>(&abs_tol)->default_value(-1),
+       "POGS absolute residual tolerance")
+      ("rel_tol", po::value<real_t>(&rel_tol)->default_value(-1),
+       "POGS relative resiudal tolerance")
       ("m", po::value<int>(&m), "# of rows in generated matrix")
       ("n", po::value<int>(&n), "# of columns in generated matrix")
       ("seed", po::value<int>(&seed), "seed")
@@ -94,14 +100,8 @@ int main(int argc, char **argv) {
                                std::istreambuf_iterator<char>());
   }
 
-  MPI_Bcast(&m, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(&seed, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  BcastString(sched_string);
-
-  Schedule sched = parse_schedule(sched_string.data(), m, n);
-
   MASTER(kRank) {
+    Schedule sched = parse_schedule(sched_string.data(), m, n);
     if (matrix_file.size() > 0) {
       real_t *a;
       LoadMatrix(matrix_file, &a, data.f, data.g);
@@ -116,12 +116,28 @@ int main(int argc, char **argv) {
     }
     m = data.f.size();
     n = data.g.size();
+
+    //PrintMatrix(data.A.data(), data.f, data.g);
   }
 
+  MPI_Bcast(&m, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&abs_tol, sizeof(real_t), MPI_BYTE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&rel_tol, sizeof(real_t), MPI_BYTE, 0, MPI_COMM_WORLD);
+  BcastString(sched_string);
 
+  Schedule sched = parse_schedule(sched_string.data(), m, n);
+
+  printf("before A_ \n");
   pogs::MatrixDistDense<real_t> A_(sched, 'r', m, n, data.A.data());
   pogs::PogsDirect<real_t, pogs::MatrixDistDense<real_t> > pogs_data(A_);
 
+  printf("%d before solve\n", kRank);
+  if (abs_tol > static_cast<real_t>(0.0)) pogs_data.SetAbsTol(abs_tol);
+  if (rel_tol > static_cast<real_t>(0.0)) pogs_data.SetRelTol(rel_tol);
+  printf("abs_tol: %.3e, rel_tol: %.3e\n",
+         pogs_data.GetAbsTol(),
+         pogs_data.GetRelTol());
   double ret = pogs_data.Solve(data.f, data.g);
 
   MPI_Finalize();
