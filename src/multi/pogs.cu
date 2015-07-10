@@ -72,6 +72,10 @@ int Pogs<T, M, P>::_Init() {
     return 1;
   _done_init = true;
 
+  double matrix_init_time;
+  double matrix_equil_time;
+  double proj_init_time;
+
   const BlockMeta &block = _A.Meta().block;
 
   size_t m = _A.Rows();
@@ -89,10 +93,22 @@ int Pogs<T, M, P>::_Init() {
   cudaMemset(_zt, 0, (m_block + n_block) * sizeof(T));
   CUDA_CHECK_ERR();
 
+  printf("%d before matrix init\n", block.row);
+  matrix_init_time = timer<double>();
   _A.Init();
+  matrix_init_time = timer<double>() - matrix_init_time;
+  printf("%d before matrix equil\n", block.row);
+  matrix_equil_time = timer<double>();
   _A.Equil(_de, _de + m_block);
+  matrix_equil_time = timer<double>() - matrix_equil_time;
+  proj_init_time = timer<double>();
   _P.Init();
+  proj_init_time = timer<double>() - proj_init_time;
   CUDA_CHECK_ERR();
+
+  BMARK_PRINT_T("matrix_init_time", matrix_init_time);
+  BMARK_PRINT_T("matrix_equil_time", matrix_equil_time);
+  BMARK_PRINT_T("proj_init_time", proj_init_time);
 
   return 0;
 }
@@ -174,6 +190,26 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
   const T kProjTolIni = static_cast<T>(1e-5);
   bool use_exact_stop = true;
 
+  // ============ Timings ==============
+  double total_time = timer<double>();
+
+  // Init times
+  double init_time = total_time;
+  double init_matrix_projector_time = 0;
+  double dist_prox_time = 0;
+
+  double preprocess_time = 0;
+  double bcast_meta_time = 0;
+
+  // Per iteration totals
+  double total_iter_time = 0;
+  double total_prox_time = 0;
+  double total_global_tol_time = 0;
+  double total_proj_time = 0;
+  double total_global_norm_time = 0;
+  double total_avg_time = 0;
+  //====================================
+
   int kRank, kNodes;
   MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
   MPI_Comm_size(MPI_COMM_WORLD, &kNodes);
@@ -191,18 +227,17 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
   printf("%d after avg splits\n", kRank);
 
   // Initialize Projector P and Matrix A.
+  init_matrix_projector_time = timer<double>();
   if (!_done_init)
     _Init();
-
+  init_matrix_projector_time = timer<double>() - init_matrix_projector_time;
 
   MPI_Datatype t_type = mpih::MPIDTypeFromT<T>();
 
-  double prox_time = timer<double>();
+  dist_prox_time = timer<double>();
   std::vector<FunctionObj<T> > local_f, local_g;
   DistributeProximals(_A.GetSchedule(), f, g, local_f, local_g);
-  MASTER(kRank) {
-    BMARK_PRINT_T("dist_prox_time", timer<double>() - prox_time);
-  }
+  dist_prox_time = timer<double>() - dist_prox_time;
 
   // Extract values from pogs_data
   size_t m = _A.Rows();
@@ -302,6 +337,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
 
   // Save initialization time.
   double time_init = timer<double>() - t0;
+  init_time = timer<double>() - init_time;
 
   // Signal start of execution.
   MASTER(kRank) {
@@ -328,14 +364,22 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
   T nrm_r, nrm_s, gap, eps_gap, eps_pri, eps_dua;
 
   for (;; ++k) {
+    double iter_time = timer<double>();
+    double prox_time = 0;
+    double global_tol_time = 0;
+    double proj_time = 0;
+    double global_norm_time = 0;
+    double avg_time = 0;
+
     cml::vector_memcpy(&zprev, &z);
 
+    prox_time = timer<double>();
     // Evaluate Proximal Operators
     cml::blas_axpy(hdl, -kOne, &zt, &z);
     ProxEval(g_gpu, _rho, x_avg.data, x12.data);
     ProxEval(f_gpu, _rho, y.data, y12.data);
     CUDA_CHECK_ERR();
-
+    prox_time = timer<double>() - prox_time;
 
     // Compute gap, optval, and tolerances.
     cml::blas_axpy(hdl, -kOne, &z12, &z);
@@ -344,9 +388,11 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     gap = std::abs(gap);
     eps_gap = sqrtmn_atol + _rel_tol * cml::blas_nrm2(hdl, &z) *
     cml::blas_nrm2(hdl, &z12); */
+    global_tol_time = timer<double>();
     eps_pri = sqrtm_atol + _rel_tol * mpih::dist_blas_nrm2(hdl, &y12);
     eps_dua = _rho * (sqrtn_atol + _rel_tol * mpih::dist_blas_nrm2(hdl, &x));
     CUDA_CHECK_ERR();
+    global_tol_time = timer<double>() - global_tol_time;
 
     // Apply over relaxation.
     cml::vector_memcpy(&ztemp, &zt);
@@ -354,12 +400,14 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     cml::blas_axpy(hdl, kOne - kAlpha, &zprev, &ztemp);
     CUDA_CHECK_ERR();
 
+    proj_time = timer<double>();
     // Project onto y = Ax.
     T proj_tol = kProjTolMin / std::pow(static_cast<T>(k + 1), kProjTolPow);
     proj_tol = std::max(proj_tol, kProjTolMax);
     _P.Project(xtemp.data, ytemp.data, kOne, x.data, y.data, proj_tol);
     cudaDeviceSynchronize();
     CUDA_CHECK_ERR();
+    proj_time = timer<double>() - proj_time;
 
     ///////////
     // TODO: Not sure how to handle this because zprev is different for each
@@ -379,6 +427,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     // nrm_r = sqrtf(nrm_r + cml::blas_dot(hdl, &xtemp, &xtemp));
 
     // Calculate exact residuals only if necessary.
+    global_norm_time = timer<double>();
     bool exact = false;
     if (true || (nrm_r < eps_pri && nrm_s < eps_dua) || use_exact_stop) {
       cml::vector_memcpy(&ztemp, &z12);
@@ -396,14 +445,20 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
       }
     }
     CUDA_CHECK_ERR();
+    global_norm_time = timer<double>() - global_norm_time;
 
     // Evaluate stopping criteria.
     converged = exact && nrm_r < eps_pri && nrm_s < eps_dua &&
         (!_gap_stop || gap < eps_gap);
+    T optval = static_cast<T>(0);
+#ifdef DEBUG
+    if (true) {
+#elseif
     if (_verbose > 2 && k % 10  == 0 ||
         _verbose > 1 && k % 100 == 0 ||
         _verbose > 1 && converged) {
-      T optval = FuncEval(f_gpu, y12.data);
+#endif
+      optval = FuncEval(f_gpu, y12.data);
       MPI_Allreduce(MPI_IN_PLACE, &optval, 1, t_type, MPI_SUM, MPI_COMM_WORLD);
       cudaDeviceSynchronize();
 
@@ -418,9 +473,11 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
                         over_m.begin(), g_gpu.begin(),
                         ApplyOp<T, thrust::divides<T> >
                         (thrust::divides<T>()));
+#ifndef DEBUG
       if (kRank == 0) {
         Printf("%5d : %.2e  %.2e  %.2e  %.2e  %.2e  %.2e % .2e\n",
                k, nrm_r, eps_pri, nrm_s, eps_dua, gap, eps_gap, optval);
+#endif
       }
     }
 
@@ -465,6 +522,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     }
 
     // Perform average operation over x values
+    avg_time = timer<double>();
     cml::vector_memcpy(&x_avg, &x);
     cml::blas_axpy(hdl, -kOne, &xt, &x_avg);
     MASTER(kRank) {
@@ -480,6 +538,31 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     }
     MPI_Bcast(x_avg.data, x_avg.size, t_type, 0, MPI_COMM_WORLD);
     cudaDeviceSynchronize();
+    avg_time = timer<double>() - avg_time;
+
+    iter_time = timer<double>() - iter_time;
+    MASTER(kRank) {
+      BMARK_ITER_PRINT_T(k, "nrm_r", nrm_r);
+      BMARK_ITER_PRINT_T(k, "nrm_s", nrm_s);
+      BMARK_ITER_PRINT_T(k, "eps_pri", eps_pri);
+      BMARK_ITER_PRINT_T(k, "eps_dua", eps_dua);
+      BMARK_ITER_PRINT_T(k, "optval", optval);
+
+      // Timings
+      total_iter_time += iter_time;
+      total_prox_time += prox_time;
+      total_global_tol_time += global_tol_time;
+      total_proj_time += proj_time;
+      total_global_norm_time += global_norm_time;
+      total_avg_time += avg_time;
+
+      BMARK_ITER_PRINT_T(k, "iter_time", iter_time);
+      BMARK_ITER_PRINT_T(k, "prox_time", prox_time);
+      BMARK_ITER_PRINT_T(k, "global_tol_time", global_tol_time);
+      BMARK_ITER_PRINT_T(k, "proj_time", proj_time);
+      BMARK_ITER_PRINT_T(k, "global_norm_time", global_norm_time);
+      BMARK_ITER_PRINT_T(k, "avg_time", avg_time);
+    }
   }
 
   // Reverse division by number of M blocks so we can compute global opt value
@@ -506,6 +589,11 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
   MASTER(kRank) {
     if (_verbose > 0) {
       double total = timer<double>() - t0;
+
+      T error_pri = _rel_tol * nrm_r / eps_pri;
+      T error_dua = _rel_tol * nrm_s / eps_dua;
+      T error_gap = _rel_tol * gap / eps_gap;
+
       Printf(__HBAR__
              "Status: %s\n"
              "Timing: Total = %3.2e s, Init = %3.2e s\n"
@@ -516,23 +604,30 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
              "Pri: "
              "|Ax - y|    / (abs_tol sqrt(m)     / rel_tol + |y|)          = %.2e\n"
              "Dua: "
-             "|A'l + u|   / (abs_tol sqrt(n)     / rels, Init = %3.2e s\n"
-             "Iter  : %u\n",
-             PogsStatusString(status).c_str(), timer<double>() - t0, time_init, k);
-      Printf(__HBAR__
-             "Error Metrics:\n"
-             "Pri: "
-             "|Ax - y|    / (abs_tol sqrt(m)     / rel_tol + |y|)          = %.2e\n"
-             "Dua: "
              "|A'l + u|   / (abs_tol sqrt(n)     / rel_tol + |u|)          = %.2e\n"
              "Gap: "
              "|x'u + y'l| / (abs_tol sqrt(m + n) / rel_tol + |x,u| |y,l|)  = %.2e\n"
-             __HBAR__, _rel_tol * nrm_r / eps_pri, _rel_tol * nrm_s / eps_dua,
-             _rel_tol * gap / eps_gap);
+             __HBAR__,
+             error_pri, error_dua, error_gap);
 
       BMARK_PRINT_T("final_optval", _optval);
-      BMARK_PRINT_T("total_time", total);
+      BMARK_PRINT_T("error_pri", error_pri);
+      BMARK_PRINT_T("error_dua", error_dua);
+      BMARK_PRINT_T("final_optval", _optval);
       BMARK_PRINTF("iterations", "%d", k);
+
+      // Total timings
+      BMARK_PRINT_T("total_time", total);
+      BMARK_PRINT_T("init_time", init_time);
+      BMARK_PRINT_T("init_matrix_projector_time", init_matrix_projector_time);
+      BMARK_PRINT_T("dist_prox_time", dist_prox_time);
+
+      BMARK_PRINT_T("total_iter_time", total_iter_time);
+      BMARK_PRINT_T("total_prox_time", total_prox_time);
+      BMARK_PRINT_T("total_global_tol_time", total_global_tol_time);
+      BMARK_PRINT_T("total_proj_time", total_proj_time);
+      BMARK_PRINT_T("total_global_norm_time", total_global_norm_time);
+      BMARK_PRINT_T("total_avg_time", total_avg_time);
     }
   }
 
