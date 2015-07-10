@@ -203,7 +203,7 @@ int ProjectorDirect<T, M>::Project(const T *x0, const T *y0, T s, T *x, T *y,
     CUDA_CHECK_ERR();
   }
 
-#ifdef DEBUG
+#if FALSE
   // Verify that projection was successful.
   CheckProjection(&_A, x0, y0, x, y, s,
       static_cast<T>(1e3) * std::numeric_limits<T>::epsilon());
