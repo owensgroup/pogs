@@ -265,6 +265,7 @@
 #define DEBUG_PRINT_IF(statement, message, ...)  do { } while (0)
 #define BMARK_PRINTF(name, format, ...)          do { } while (0)
 #define BMARK_PRINT_T(name, value)               do { } while (0)
+#define BMARK_ITER_PRINT_T(name, format, ...)    do { } while (0)
 
 #else
 #define BMARK_SEP ":"
@@ -492,6 +493,11 @@
 #define BMARK_PRINT_T(name, value) \
   do { \
     printf("BMARK %s" BMARK_SEP " %.3e\n", name, value); \
+  } while (0)
+
+#define BMARK_ITER_PRINT_T(iter, name, value) \
+  do { \
+    printf("BMARK iter, %d, %s" BMARK_SEP " %.3e\n", iter, name, value); \
   } while (0)
 
 /* #define BMARK_PRINT_T(name, ..., value) \ */
