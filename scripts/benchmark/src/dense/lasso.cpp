@@ -24,6 +24,7 @@ ExampleData<T> Lasso(pogs::Schedule &s, size_t m, size_t n, int seed) {
   int kRank;
   MPI_Comm_rank(MPI_COMM_WORLD, &kRank);
 
+  double t2 = timer<double>();
   MASTER(kRank) {
     A.resize(m * n);
     b.resize(m);
@@ -98,7 +99,7 @@ ExampleData<T> Lasso(pogs::Schedule &s, size_t m, size_t n, int seed) {
       g.emplace_back(kAbs, static_cast<T>(0.2) * lambda_max);
   }
 
-  return {A, f, g};
+  return {std::move(A), std::move(f), std::move(g)};
 }
 
 template ExampleData<double> Lasso<double>(pogs::Schedule &s, size_t m,
