@@ -458,10 +458,12 @@ void DistributeBlocks(const Schedule &s,
             cudaMemcpy(gpu_data + gpu_offset, orig_data + offset,
                        size * sizeof(T), cudaMemcpyDefault);
           } else {
-            MPI_Isend(orig_data + offset, size * sizeof(T), MPI_BYTE, node, 0,
-                      MPI_COMM_WORLD, &request[node - 1]);
-            if (row != block.row_end - 1)
-              MPI_Request_free(&request[node - 1]);
+            // MPI_Isend(orig_data + offset, size * sizeof(T), MPI_BYTE, node, 0,
+            //           MPI_COMM_WORLD, &request[node - 1]);
+            // if (row != block.row_end - 1)
+            //   MPI_Request_free(&request[node - 1]);
+            MPI_Send(orig_data + offset, size * sizeof(T), MPI_BYTE, node, 0,
+                     MPI_COMM_WORLD);
           }
         }
       }
@@ -491,15 +493,19 @@ void DistributeBlocks(const Schedule &s,
     size_t columns = block.column_end - block.column_begin;
 
     T *temp_data = new T[rows * columns];
-    
+
     if (ord == MatrixDistDense<T>::ROW) {
+      printf("node %d receiving rows\n", kRank);
       for (size_t row = 0; row < rows; ++row) {
         size_t offset = row * columns;
         size_t size = columns;
         // MPI
         MPI_Recv(temp_data + offset, size * sizeof(T), MPI_BYTE, 0, MPI_ANY_TAG,
                  MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        // if (kRank == 7)
+        //   printf("node %d received row %d\n", kRank, row);
       }
+      printf("node %d received all rows\n", kRank);
     } else {
       for (size_t col = 0; col < columns; ++col) {
         size_t offset = col * rows;
@@ -516,7 +522,7 @@ void DistributeBlocks(const Schedule &s,
   }
 
   MASTER(kRank) {
-    MPI_Waitall(kNodes - 1, request, MPI_STATUSES_IGNORE);
+    //MPI_Waitall(kNodes - 1, request, MPI_STATUSES_IGNORE);
     delete [] request;
   }
 }
