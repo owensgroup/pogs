@@ -95,7 +95,7 @@ def run_job_file(spec_file, config_name, config, test_name, param_num,
 
 def run_job_memory(spec_file, config_name, config, test_name):
     test_resources = '-l {resources} -l walltime=24:00:00'
-    test_resources.format(resources=config['resources'])
+    test_resources = test_resources.format(resources=config['resources'])
     misc = test_resources
     job_plan = config_name + ':' + test_name
     results_file = job_plan.replace(':', '_') + '_results.json'
