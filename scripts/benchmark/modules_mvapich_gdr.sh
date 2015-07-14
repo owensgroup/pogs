@@ -10,3 +10,5 @@ module load numactl/2.0.9
 module load python/2.7.4
 
 export MV2_USE_CUDA=1
+export MV2_NDREG_ENTRIES=16384
+export MV2_NDREG_ENTRIES_MAX=16384
