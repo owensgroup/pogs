@@ -22,6 +22,11 @@
             "run": "./run",
             "resources": "nodes=1:k40:ppn=1"
         },
+        "row_1_d" : {
+            "solver": "multi_dense",
+            "run": "mpirun -np 1 ./run --schedule schedule_gpu1.json",
+            "resources": "nodes=1:k40:ppn=1"
+        },
         "row_2_d" : {
             "solver": "multi_dense",
             "run": "mpirun -np 2 ./run --schedule schedule_gpu2.json",
