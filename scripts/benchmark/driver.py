@@ -66,7 +66,7 @@ def gen_matrix_job(test_name, params, cleanup_job_id):
                                          matrix=matrix_file)
     p = qsub('gen_matrix', 'gen_matrix.sh', matrix_params, misc)
     sout, serr = p.communicate()
-    return sout.readline()
+    return sout.decode()
 
 
 def cleanup_matrix_job(test_name, params, job_ids):
@@ -80,7 +80,7 @@ def cleanup_matrix_job(test_name, params, job_ids):
     matrix_params = '--matrix {matrix}'.format(matrix=matrix_file)
     p = qsub('cleanup_matrix', 'cleanup_matrix.sh', matrix_params, misc)
     sout, serr = p.communicate()
-    return sout.readline()
+    return sout.decode()
 
 
 def run_job_file(spec_file, config_name, config, test_name, param_num,
@@ -96,7 +96,7 @@ def run_job_file(spec_file, config_name, config, test_name, param_num,
     args = args.format(spec=spec_file, plan=job_plan, results=results_file)
     p = qsub(config_name, 'run_job.sh', args, misc)
     sout, serr = p.communicate()
-    return sout.readline()
+    return sout.decode()
 
 
 def run_job_memory(spec_file, config_name, config, test_name):
@@ -109,7 +109,7 @@ def run_job_memory(spec_file, config_name, config, test_name):
     args = args.format(spec=spec_file, plan=job_plan, results=results_file)
     p = qsub(config_name, 'run_job_memory.sh', args, misc)
     sout, serr = p.communicate()
-    return sout.readline()
+    return sout.decode()
 
 
 #
@@ -138,7 +138,7 @@ def launch_jobs_file(spec_file, plan, config):
             # cleanup matrix
             p = qsub()
             sout, serr = p.communicate()
-            cleanup_job_id = sout.readline()
+            cleanup_job_id = sout.decode()
         # Finish up after a single test
     # Finish up after all tests
     p = qsub()
