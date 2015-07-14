@@ -44,6 +44,7 @@ def qsub(name, script, args, misc):
     cmd = ('qsub -F "{args}" -N {name} -o {name}.out -e {name}.err '
            '{misc} {script}')
     cmd = cmd.format(name=name, misc=misc, args=args, script=script)
+    tprint('Launching job: ' + cmd)
     return subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
