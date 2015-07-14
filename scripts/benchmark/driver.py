@@ -65,7 +65,8 @@ def gen_matrix_job(test_name, params, cleanup_job_id):
                                          typ=params['type'],
                                          matrix=matrix_file)
     p = qsub('gen_matrix', 'gen_matrix.sh', matrix_params, misc)
-    return p.communicate().readline()
+    sout, serr = p.communicate()
+    return sout.readline()
 
 
 def cleanup_matrix_job(test_name, params, job_ids):
@@ -78,7 +79,8 @@ def cleanup_matrix_job(test_name, params, job_ids):
     matrix_file = gen_matrix_filename(test_name, params)
     matrix_params = '--matrix {matrix}'.format(matrix=matrix_file)
     p = qsub('cleanup_matrix', 'cleanup_matrix.sh', matrix_params, misc)
-    return p.communicate().readline()
+    sout, serr = p.communicate()
+    return sout.readline()
 
 
 def run_job_file(spec_file, config_name, config, test_name, param_num,
@@ -93,7 +95,8 @@ def run_job_file(spec_file, config_name, config, test_name, param_num,
     args = '--spec {spec} --plan {plan} --results {results}'
     args = args.format(spec=spec_file, plan=job_plan, results=results_file)
     p = qsub(config_name, 'run_job.sh', args, misc)
-    return p.communicate().readline()
+    sout, serr = p.communicate()
+    return sout.readline()
 
 
 def run_job_memory(spec_file, config_name, config, test_name):
@@ -105,7 +108,8 @@ def run_job_memory(spec_file, config_name, config, test_name):
     args = '--spec {spec} --plan {plan} --results {results}'
     args = args.format(spec=spec_file, plan=job_plan, results=results_file)
     p = qsub(config_name, 'run_job_memory.sh', args, misc)
-    return p.communicate().readline()
+    sout, serr = p.communicate()
+    return sout.readline()
 
 
 #
@@ -133,7 +137,8 @@ def launch_jobs_file(spec_file, plan, config):
                 run_job_ids.append(job_id)
             # cleanup matrix
             p = qsub()
-            cleanup_job_id = p.communicate().readline()
+            sout, serr = p.communicate()
+            cleanup_job_id = sout.readline()
         # Finish up after a single test
     # Finish up after all tests
     p = qsub()
