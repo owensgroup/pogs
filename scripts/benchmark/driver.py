@@ -86,7 +86,7 @@ def run_job_file(spec_file, config_name, config, test_name, param_num,
     depend_on.format(matrix_id=gen_job_id)
     misc = test_resources + ' ' + depend_on
     job_plan = config_name + ':' + test_name + ':' + param_num
-    results_file = job_plan.replace(':', '_') + 'results.json'
+    results_file = job_plan.replace(':', '_') + '_results.json'
     args = '--spec {spec} --plan {plan} --results {results}'
     args = args.format(spec=spec_file, plan=job_plan, results=results_file)
     p = qsub(config_name, 'run_job.sh', args, misc)
@@ -98,7 +98,7 @@ def run_job_memory(spec_file, config_name, config, test_name):
     test_resources.format(resources=config['resources'])
     misc = test_resources
     job_plan = config_name + ':' + test_name
-    results_file = job_plan.replace(':', '_') + 'results.json'
+    results_file = job_plan.replace(':', '_') + '_results.json'
     args = '--spec {spec} --plan {plan} --results {results}'
     args = args.format(spec=spec_file, plan=job_plan, results=results_file)
     p = qsub(config_name, 'run_job_memory.sh', args, misc)
