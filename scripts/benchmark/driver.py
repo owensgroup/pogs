@@ -41,12 +41,15 @@ def process_plan_spec(plan_spec, config):
 
 
 def qsub(name, script, args, misc):
-    cmd = ('qsub -F "{args}" -N {name} -o {name}.out -e {name}.err'
+    cmd = ('qsub -F "{args}" -N {name} -o {name}.out -e {name}.err '
            '{misc} {script}')
     cmd = cmd.format(name=name, misc=misc, args=args, script=script)
-    return subprocess.Popen(cmd,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE)
+    return subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True
+    )
 
 
 def gen_matrix_job(test_name, params, cleanup_job_id):
