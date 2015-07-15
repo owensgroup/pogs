@@ -31,7 +31,7 @@ class MatrixDist {
  public:
   MatrixDist(const Schedule &s, size_t m, size_t n)
     : _S(s), _meta(meta_init(s)), _m(m), _n(n), _info(0), _done_init(false)
-    { cudaSetDevice(_meta.gpu_indicies[0]); };
+    { cudaSetDevice(_meta.gpu_indices[0]); };
 
   virtual ~MatrixDist() { };
 
