@@ -45,9 +45,9 @@ Schedule parse_schedule(const char* json_schedule,
     proc.block.column_begin = n_per * proc.block.column;
     proc.block.column_end = n_per * (proc.block.column + 1);
 
-    const Value& gpus = a[i]["gpu_indicies"];
+    const Value& gpus = a[i]["gpu_indices"];
     for (SizeType i = 0; i < gpus.Size(); ++i) {
-      proc.gpu_indicies.push_back(gpus[i].GetInt());
+      proc.gpu_indices.push_back(gpus[i].GetInt());
     }
 
     info.push_back(proc);

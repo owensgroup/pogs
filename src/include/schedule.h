@@ -28,7 +28,7 @@ struct BlockMeta {
 struct ProcessInfo {
   MatrixMeta matrix;
   BlockMeta block;
-  std::vector<int> gpu_indicies;
+  std::vector<int> gpu_indices;
 
 };
 

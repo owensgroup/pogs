@@ -2,7 +2,7 @@
     "m_blocks": 2,
     "n_blocks": 1,
     "info": [
-        { "block": { "row": 0, "column": 0 }, "gpu_indicies": [0] },
-        { "block": { "row": 1, "column": 0 }, "gpu_indicies": [1] }
+        { "block": { "row": 0, "column": 0 }, "gpu_indices": [0] },
+        { "block": { "row": 1, "column": 0 }, "gpu_indices": [1] }
     ]
 }

@@ -83,7 +83,7 @@ int Pogs<T, M, P>::_Init() {
   size_t m_block = block.Rows();
   size_t n_block = block.Cols();
 
-  cudaSetDevice(_A.Meta().gpu_indicies[0]);
+  cudaSetDevice(_A.Meta().gpu_indices[0]);
 
   cudaMalloc(&_de, (m_block + n_block) * sizeof(T));
   cudaMalloc(&_z, (m_block + n_block) * sizeof(T));
