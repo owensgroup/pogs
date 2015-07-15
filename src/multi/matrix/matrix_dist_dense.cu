@@ -65,7 +65,7 @@ MatrixDistDense<T>::MatrixDistDense(const Schedule &s, char ord,
   ASSERT(ord == 'r' || ord == 'R' || ord == 'c' || ord == 'C');
   _ord = (ord == 'r' || ord == 'R') ? ROW : COL;
 
-  cudaSetDevice(MatrixDist<T>::_meta.gpu_indicies[0]);
+  cudaSetDevice(MatrixDist<T>::_meta.gpu_indices[0]);
 
   // Set GPU specific _info.
   GpuData<T> *info = new GpuData<T>(data);
