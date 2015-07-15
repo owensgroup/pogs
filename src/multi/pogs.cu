@@ -525,12 +525,15 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     avg_time = timer<double>();
     cml::vector_memcpy(&x_avg, &x);
     cml::blas_axpy(hdl, -kOne, &xt, &x_avg);
+    printf("BMARK iter, %d, x_before_avg, %d" BMARK_SEP " %.3e\n",
+           k, kRank, cml::blas_nrm2(hdl, &x_avg));
     MASTER(kRank) {
       mpih::Reduce(hdl, x_avg.data, x_avg_temp.data, x_avg.size, MPI_SUM, 0,
                    MPI_COMM_WORLD);
       cudaDeviceSynchronize();
       cml::vector_memcpy(&x_avg, &x_avg_temp);
       cml::blas_scal(hdl, 1.0 / _A.GetSchedule().MBlocks(), &x_avg);
+      BMARK_ITER_PRINT_T(k, "x_after_avg", cml::blas_nrm2(hdl, &x_avg));
     } else {
       mpih::Reduce(hdl, x_avg.data, x_avg.data, x_avg.size, MPI_SUM, 0,
                    MPI_COMM_WORLD);
