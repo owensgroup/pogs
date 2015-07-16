@@ -108,15 +108,12 @@ def run_job_file(spec_file, config_name, config, test_name, param_num,
     return sout.decode()
 
 
-def run_job_memory(spec_file, config_name, config, test_name):
+def run_job_memory(spec_file, config_name, config, test_name, results_dir):
     test_resources = '-l {resources} -l walltime=24:00:00'
     test_resources = test_resources.format(resources=config['resources'])
     misc = test_resources
     job_plan = config_name + ':' + test_name
 
-    results_dir = get_results_dir()
-    if not os.path.exists(results_dir):
-        os.makedirs(results_dir)
     results_file = results_dir + '/' + format_results_file(job_plan)
 
     args = '--spec {spec} --plan {plan} --results {results}'
@@ -162,6 +159,10 @@ def launch_jobs_memory(spec_file, plan, config):
     configs = config['configs']
     tests = config['tests']
 
+    results_dir = get_results_dir()
+    if not os.path.exists(results_dir):
+        os.makedirs(results_dir)
+
     for test_name, configurations in plan.iteritems():
         if not test_name in tests:
             tprint('Test', test_name, 'not in tests')
@@ -171,7 +172,8 @@ def launch_jobs_memory(spec_file, plan, config):
             run_job_memory(spec_file,
                            config_name,
                            config,
-                           test_name)
+                           test_name,
+                           results_dir)
 
 
 def main(args):
