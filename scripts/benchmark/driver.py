@@ -1,7 +1,7 @@
 #! python
 
 # System imports
-import time
+from datetime import datetime
 import os
 import json
 import subprocess32 as subprocess
@@ -38,6 +38,14 @@ def parse_plan_file(plan_file):
 
 def process_plan_spec(plan_spec, config):
     return plan_spec
+
+
+def get_results_dir():
+    return 'results/' + datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+
+
+def format_results_file(job_plan):
+    return job_plan.replace(':', '_') + '.json'
 
 
 def qsub(name, script, args, misc):
@@ -105,7 +113,12 @@ def run_job_memory(spec_file, config_name, config, test_name):
     test_resources = test_resources.format(resources=config['resources'])
     misc = test_resources
     job_plan = config_name + ':' + test_name
-    results_file = job_plan.replace(':', '_') + '_results.json'
+
+    results_dir = get_results_dir()
+    if not os.path.exists(results_dir):
+        os.makedirs(results_dir)
+    results_file = results_dir + '/' + format_results_file(job_plan)
+
     args = '--spec {spec} --plan {plan} --results {results}'
     args = args.format(spec=spec_file, plan=job_plan, results=results_file)
     p = qsub(config_name, 'run_job_memory.sh', args, misc)
