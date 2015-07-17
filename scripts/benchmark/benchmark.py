@@ -183,6 +183,11 @@ def run_plan_memory(plan, config):
                     'out': sout,
                     'err': serr
                 }
+            # Add test metadata
+            result['params'] = param
+            result['config_name'] = config_name
+            result['solver_name'] = config_info['solver']
+            result['test_name'] = test_name
             plan_results[config_name][test_name].append(result)
         tprint('Finished test')
     return plan_results
