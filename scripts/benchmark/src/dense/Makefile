@@ -1,15 +1,18 @@
+PIFLAGS="-Xcompiler -fopenmp"
+IFLAGS=-fopenmp
+
 # User Vars
 POGSROOT=../../../../src
-CUDAROOT=/usr/local/cuda-6.5
+CUDAROOT=$(CUDA_HOME)
 
 # Example Files
 EXSRC=examples.cpp lasso.cpp lp_eq_m.cpp lasso_path.cpp logistic.cpp lp_eq.cpp lp_ineq.cpp nonneg_l2.cpp svm.cpp
 
-LD_BOOST=-I/home/abpoms/boost/boost_1_57_0
-LIB_BOOST=-L/home/abpoms/boost/boost_1_57_0/stage/lib -lboost_program_options
+LD_BOOST=-I$(BOOST_INC_PATH)
+LIB_BOOST=-L$(BOOST_LIB_PATH) -lboost_program_options
 
 # C++ Flags
-CXX=g++
+CXX=mpic++
 CXXFLAGS=$(IFLAGS) -g -O3 -I$(POGSROOT)/include $(LIB_BOOST) -std=c++11 -Wall -Wconversion
 
 # CUDA Flags
@@ -20,10 +23,10 @@ MPI_CFLAGS = $(shell mpic++ --showme:compile)
 MPI_LFLAGS = $(shell mpic++ --showme:link)
 
 #MPI_ROOT=/home/abpoms/mvapich2-2.1
-MPI_ROOT=/usr/local/openmpi
-MPI_CFLAGS=-I$(MPI_ROOT)/include 
-MPI_LFLAGS=-Xlinker -rpath -Xlinker $(MPI_ROOT)/lib -Xlinker \
---enable-new-dtags -L$(MPI_ROOT)/lib -lmpi_cxx -lmpi
+MPI_ROOT=$(MPI_HOME)
+# MPI_CFLAGS=-I$(MPI_ROOT)/include 
+# MPI_LFLAGS=-Xlinker -rpath -Xlinker $(MPI_ROOT)/lib -Xlinker \
+# --enable-new-dtags -L$(MPI_ROOT)/lib -lmpi_cxx -lmpi
 
 # Check System Args.
 UNAME = $(shell uname -s)
@@ -37,18 +40,18 @@ endif
 
 # CPU
 cpu: run_all.cpp examples.h $(EXSRC)
-	$(MAKE) cpu -C $(POGSROOT) IFLAGS=$(IFLAGS)
+	$(MAKE) cpu -C $(POGSROOT) IFLAGS=$(PIFLAGS)
 	$(CXX) $(CXXFLAGS) -o run $(EXSRC) $<	$(POGSROOT)/build/pogs.a $(LDFLAGS)
 
 # GPU
 gpu: run_test.cpp examples.h $(EXSRC)
-	$(MAKE) multi -C $(POGSROOT) IFLAGS=$(IFLAGS)
-	$(CXX) $(CXXFLAGS) $(MPI_CFLAGS) -o run $(EXSRC) $< $(POGSROOT)/build/pogs.a $(CULDFLAGS) $(MPI_LFLAGS)
+	$(MAKE) multi -C $(POGSROOT) IFLAGS=$(PIFLAGS)
+	$(CXX) $(CXXFLAGS) -o run $(EXSRC) $< $(POGSROOT)/build/pogs.a $(CULDFLAGS)
 
 # GPU
 gen: gen_matrix.cpp examples.h $(EXSRC)
 	$(MAKE) multi -C $(POGSROOT) IFLAGS=$(IFLAGS)
-	$(CXX) $(CXXFLAGS) $(MPI_CFLAGS) -o gen_matrix $(EXSRC) $< $(POGSROOT)/build/pogs.a $(CULDFLAGS) $(MPI_LFLAGS)
+	$(CXX) $(CXXFLAGS) -o gen_matrix $(EXSRC) $< $(POGSROOT)/build/pogs.a $(CULDFLAGS) 
 
 clean:
 	$(MAKE) -C $(POGSROOT) clean

@@ -7,8 +7,6 @@
 
 #define MASTER(rank) if (rank == 0)
 
-#define MVAPICH false
-
 namespace mpih {
 
 namespace {
@@ -52,7 +50,7 @@ int Reduce(cublasHandle_t b_hdl,
            T *send, T *recv, int count, MPI_Op op, int node, MPI_Comm comm) {
   MPI_Datatype t_type = MPIDTypeFromT<T>();
   // MVAPICH
-#if MVAPICH
+#ifdef MVAPICH
   return MPI_Reduce(send, recv, count, t_type, op, node, comm);
 #else
   // OpenMPI
@@ -99,7 +97,7 @@ int Allreduce(cublasHandle_t b_hdl,
               T *send, T *recv, int count, MPI_Op op, MPI_Comm comm) {
   MPI_Datatype t_type = MPIDTypeFromT<T>();
   // MVAPICH
-#if MVAPICH
+#ifdef MVAPICH
   return MPI_Allreduce(send, recv, count, t_type, op, comm);
 #else
   // OpenMPI
