@@ -24,6 +24,9 @@ ExampleData<T> LpEq(pogs::Schedule &s, size_t m, size_t n, int seed);
 template <typename T>
 ExampleData<T> LpEqM(pogs::Schedule &s, size_t m, size_t n, int seed);
 
+template <typename T>
+ExampleData<T> LpCone(pogs::Schedule &s, size_t m, size_t n, int seed);
+
 /* template <typename T>
 double LassoPath(pogs::Schedule &s, size_t m, size_t n, int seed);
 
@@ -47,7 +50,8 @@ using GenFn = ExampleData<T> (*)(pogs::Schedule &s, size_t m, size_t n,
 enum ProblemType {
   LASSO,
   LP_EQ,
-  LP_EQ_M
+  LP_EQ_M,
+  LP_CONE
   // LASSO_PATH,
   // LOGISTIC,
   // LP_INEQ,
