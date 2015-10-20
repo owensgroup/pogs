@@ -206,6 +206,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
   double total_prox_time = 0;
   double total_global_tol_time = 0;
   double total_proj_time = 0;
+  double total_local_norm_time = 0;
   double total_global_norm_time = 0;
   double total_avg_time = 0;
   //====================================
@@ -368,6 +369,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     double prox_time = 0;
     double global_tol_time = 0;
     double proj_time = 0;
+    double local_norm_time = 0;
     double global_norm_time = 0;
     double avg_time = 0;
 
@@ -427,25 +429,31 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
     // nrm_r = sqrtf(nrm_r + cml::blas_dot(hdl, &xtemp, &xtemp));
 
     // Calculate exact residuals only if necessary.
-    global_norm_time = timer<double>();
+    local_norm_time = timer<double>();
     bool exact = false;
     if (true || (nrm_r < eps_pri && nrm_s < eps_dua) || use_exact_stop) {
       cml::vector_memcpy(&ztemp, &z12);
       _A.BlockMul('n', kOne, x12.data, -kOne, ytemp.data);
       cudaDeviceSynchronize();
+      local_norm_time = timer<double>() - local_norm_time;
+      global_norm_time = timer<double>();
       nrm_r = mpih::dist_blas_nrm2(hdl, &ytemp);
+      global_norm_time = timer<double>() - global_norm_time;
       if ((nrm_r < eps_pri) || use_exact_stop) {
+        double local_temp = timer<double>();
         cml::vector_memcpy(&ztemp, &z12);
         cml::blas_axpy(hdl, kOne, &zt, &ztemp);
         cml::blas_axpy(hdl, -kOne, &zprev, &ztemp);
         _A.BlockMul('t', kOne, ytemp.data, kOne, xtemp.data);
         cudaDeviceSynchronize();
+        local_norm_time += (timer<double>() - local_temp);
+        double global_temp = timer<double>();
         nrm_s = _rho * mpih::dist_blas_nrm2(hdl, &xtemp);
+        global_norm_time += (timer<double>() - global_temp);
         exact = true;
       }
     }
     CUDA_CHECK_ERR();
-    global_norm_time = timer<double>() - global_norm_time;
 
     // Evaluate stopping criteria.
     converged = exact && nrm_r < eps_pri && nrm_s < eps_dua &&
@@ -556,6 +564,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
       total_prox_time += prox_time;
       total_global_tol_time += global_tol_time;
       total_proj_time += proj_time;
+      total_local_norm_time += local_norm_time;
       total_global_norm_time += global_norm_time;
       total_avg_time += avg_time;
 
@@ -563,6 +572,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
       BMARK_ITER_PRINT_T(k, "prox_time", prox_time);
       BMARK_ITER_PRINT_T(k, "global_tol_time", global_tol_time);
       BMARK_ITER_PRINT_T(k, "proj_time", proj_time);
+      BMARK_ITER_PRINT_T(k, "local_norm_time", local_norm_time);
       BMARK_ITER_PRINT_T(k, "global_norm_time", global_norm_time);
       BMARK_ITER_PRINT_T(k, "avg_time", avg_time);
     }
@@ -629,6 +639,7 @@ PogsStatus Pogs<T, M, P>::Solve(const std::vector<FunctionObj<T> > &f,
       BMARK_PRINT_T("total_prox_time", total_prox_time);
       BMARK_PRINT_T("total_global_tol_time", total_global_tol_time);
       BMARK_PRINT_T("total_proj_time", total_proj_time);
+      BMARK_PRINT_T("total_local_norm_time", total_local_norm_time);
       BMARK_PRINT_T("total_global_norm_time", total_global_norm_time);
       BMARK_PRINT_T("total_avg_time", total_avg_time);
     }
